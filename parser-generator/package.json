@@ -1,0 +1,20 @@
+{
+  "name": "ebnf-parser-generator",
+  "version": "1.0.0",
+  "description": "Generate JavaScript parsers from EBNF grammars",
+  "main": "parser-generator.js",
+  "scripts": {
+    "generate": "node parser-generator.js",
+    "build": "bash build.sh",
+    "build:safe": "bash build.sh --no-promote",
+    "build:selfhost": "bash build.sh",
+    "rex": "node ../tools/REx-main.js",
+    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js",
+    "test:unit": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js",
+    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js",
+    "selfhost:test": "node selfhost-validate.js"
+  },
+  "dependencies": {
+    "xml2js": "^0.6.2"
+  }
+}

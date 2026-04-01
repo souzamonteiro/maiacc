@@ -1,0 +1,15 @@
+/* Complete calculator grammar */
+Expression ::= Term ( ( '+' | '-' ) Term )*
+Term       ::= Power ( ( '*' | '/' ) Power )*
+Power      ::= Unary ( '^' Power )?
+Unary      ::= '-' Unary
+             | Primary
+Primary    ::= Number
+             | '(' Expression ')'
+
+<?TOKENS?>
+
+Number     ::= [0-9]+ ('.' [0-9]+)?
+
+Whitespace ::= [#x0009#x000A#x000D#x0020]+
+               /* ws: definition */
