@@ -1,10 +1,10 @@
-# MaiaCC Parser Generator
+# MaiaCC Parser Generator (tREx)
 
 ![tREx](images/TyrannosaurusRex.png)
 
 A JavaScript parser generator that reads XML produced from EBNF grammars and emits a working JavaScript lexer/parser.
 
-$# MaiaCC tREx
+# MaiaCC tREx
 
 `tREx.sh` is a wrapper script that can:
 
