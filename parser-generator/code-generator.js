@@ -129,8 +129,10 @@ class CodeGenerator {
     let escaped = '';
     for (const char of str) {
       const code = char.codePointAt(0);
-      if (code < 0x20 || code === 0x7F) {
-        escaped += `\\u${code.toString(16).padStart(4, '0')}`;
+      if (code < 0x20 || code === 0x7F || code === 0x2028 || code === 0x2029) {
+        // For control characters, create Unicode escape for regex literal
+        // In regex literal /pattern/, \uXXXX needs single backslash  
+        escaped += String.fromCharCode(92) + `u${code.toString(16).padStart(4, '0')}`;
       } else if (/[.*+?^${}()|[\]\\/]/.test(char)) {
         escaped += `\\${char}`;
       } else {
@@ -143,17 +145,36 @@ class CodeGenerator {
   // Escape raw characters in a char-class string so they're safe inside a regex literal
   escapeCharClassContent(content) {
     let result = '';
-    for (const char of content) {
+    let i = 0;
+    
+    while (i < content.length) {
+      // Preserve Unicode escape sequences like \uXXXX that grammar-parser provides
+      if (content[i] === '\\' && content[i + 1] === 'u' && 
+          i + 5 < content.length &&
+          /[0-9a-fA-F]/.test(content[i + 2]) &&
+          /[0-9a-fA-F]/.test(content[i + 3]) &&
+          /[0-9a-fA-F]/.test(content[i + 4]) &&
+          /[0-9a-fA-F]/.test(content[i + 5])) {
+        // This looks like a Unicode escape - preserve it as-is
+        result += content.substring(i, i + 6);
+        i += 6;
+        continue;
+      }
+
+      const char = content[i];
       const code = char.codePointAt(0);
-      if (code < 0x20 || code === 0x7F) {
+      
+      // Characters that need escaping in character classes
+      if (code < 0x20 || code === 0x7F || code === 0x2028 || code === 0x2029) {
         result += `\\u${code.toString(16).padStart(4, '0')}`;
       } else if (char === '\\') {
+        // Escape backslashes
         result += '\\\\';
-      } else if (char === ']') {
-        result += '\\]';
       } else {
+        // No escaping needed for other characters when we have \uXXXX escapes
         result += char;
       }
+      i++;
     }
     return result;
   }

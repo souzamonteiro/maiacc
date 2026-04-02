@@ -358,7 +358,9 @@ class GrammarParser {
       return '';
     }
 
-    return `${String.fromCodePoint(start)}-${String.fromCodePoint(end)}`;
+    const startEscape = `\\u${start.toString(16).padStart(4, '0')}`;
+    const endEscape = `\\u${end.toString(16).padStart(4, '0')}`;
+    return `${startEscape}-${endEscape}`;
   }
   
   parseCharCode(code) {
@@ -366,7 +368,11 @@ class GrammarParser {
     const codeStr = String(code);
     const match = codeStr.match(/#x([0-9a-fA-F]+)/);
     if (match) {
-      return String.fromCodePoint(parseInt(match[1], 16));
+      const codePoint = parseInt(match[1], 16);
+      if (codePoint > 0xFFFF) {
+        return '';
+      }
+      return String.fromCodePoint(codePoint);
     }
     return codeStr;
   }
