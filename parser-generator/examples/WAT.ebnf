@@ -1,0 +1,380 @@
+/*
+ * WebAssembly 3.0 Text Format Grammar
+ * Fully compatible with REx parser generator
+ * Based on the WebAssembly Specification 3.0 (2026-03-18)
+ */
+
+/* ============================================================================
+ * Syntactic Productions (Core Grammar)
+ * ============================================================================ */
+
+wat               ::= watBody
+watBody           ::= module | eof
+
+module            ::= '(' 'module' id? moduleField* ')'
+moduleField       ::= typeDef
+                    | importDef
+                    | tagDef
+                    | globalDef
+                    | memDef
+                    | tableDef
+                    | funcDef
+                    | dataDef
+                    | elemDef
+                    | startDef
+                    | exportDef
+
+typeDef           ::= '(' 'type' id? rectype ')'
+rectype           ::= '(' 'rec' subtype+ ')' | subtype
+subtype           ::= '(' 'sub' final? supertype* comptype ')' | comptype
+final             ::= 'final'
+supertype         ::= typeuse
+comptype          ::= funcType
+                    | structType
+                    | arrayType
+
+funcType          ::= '(' 'func' paramDecl* resultDecl* ')'
+structType        ::= '(' 'struct' fieldDecl* ')'
+arrayType         ::= '(' 'array' fieldDecl ')'
+fieldDecl         ::= '(' 'field' id? storagetype mutField? ')'
+
+mutField          ::= '(' 'mut' ')'
+storagetype       ::= valueType | packType
+packType          ::= 'i8' | 'i16'
+
+tagDef            ::= '(' 'tag' id? tagType ')'
+tagType           ::= typeuse
+
+globalDef         ::= '(' 'global' id? globalType expr ')'
+globalType        ::= valueType | '(' 'mut' valueType ')'
+
+memDef            ::= '(' 'memory' id? limits ')'
+
+tableDef          ::= '(' 'table' id? limits reftype ')'
+                    | '(' 'table' id? limits reftype tableExpr ')'
+
+tableExpr         ::= expr
+
+funcDef           ::= '(' 'func' id? typeuse? localDecl* expr ')'
+localDecl         ::= '(' 'local' id? valueType ')' | '(' 'local' valueType+ ')'
+
+importDef         ::= '(' 'import' string string importDesc ')'
+importDesc        ::= '(' 'func' id? typeuse? ')'
+                    | '(' 'table' id? limits reftype ')'
+                    | '(' 'memory' id? limits ')'
+                    | '(' 'global' id? globalType ')'
+                    | '(' 'tag' id? tagType ')'
+
+exportDef         ::= '(' 'export' string exportDesc ')'
+exportDesc        ::= '(' 'func' index ')'
+                    | '(' 'table' index ')'
+                    | '(' 'memory' index ')'
+                    | '(' 'global' index ')'
+                    | '(' 'tag' index ')'
+
+startDef          ::= '(' 'start' index ')'
+
+dataDef           ::= '(' 'data' id? datastring ')'
+                    | '(' 'data' id? memUse offset datastring ')'
+                    | '(' 'data' id? offset datastring ')'
+datastring        ::= string+
+
+elemDef           ::= '(' 'elem' id? elemList ')'
+                    | '(' 'elem' id? tableUse offset elemList ')'
+                    | '(' 'elem' id? offset elemList ')'
+                    | '(' 'elem' id? 'declare' elemList ')'
+elemList          ::= reftype elemExpr*
+                    | 'func' funcidx*
+elemExpr          ::= '(' 'item' expr ')'
+                    | instr
+memUse            ::= '(' 'memory' memidx ')'
+tableUse          ::= '(' 'table' tableidx ')'
+offset            ::= '(' 'offset' expr ')'
+                    | expr
+
+/* ============================================================================
+ * Instruction Productions
+ * ============================================================================ */
+
+instr             ::= foldedInstr
+                    | seqInstr
+
+/* Folded (parenthesized) instructions */
+foldedInstr       ::= '(' 'block' label? blockType? instr* ')'
+                    | '(' 'loop' label? blockType? instr* ')'
+                    | '(' 'if' label? blockType? instr* ('(' 'then' instr* ')' ('(' 'else' instr* ')')?)? ')'
+                    | '(' 'try_table' label? blockType? catchClause* instr* ')'
+                    | '(' nonBlockInstr instr* ')'
+
+catchClause       ::= '(' 'catch' tagidx label ')'
+                    | '(' 'catch_ref' tagidx label ')'
+                    | '(' 'catch_all' label ')'
+                    | '(' 'catch_all_ref' label ')'
+
+/* Sequential (unparenthesized) instructions */
+seqInstr          ::= nonBlockInstr
+                    | 'block' label? blockType? instr* 'end' id?
+                    | 'loop' label? blockType? instr* 'end' id?
+                    | 'if' label? blockType? instr* ('else' id? instr*)? 'end' id?
+                    | 'try_table' label? blockType? catchClause* instr* 'end' id?
+
+/* All plain instructions usable in both sequential and folded context */
+nonBlockInstr     ::= 'nop'
+                    | 'unreachable'
+                    | 'drop'
+                    | 'return'
+                    | 'throw_ref'
+                    | 'select' resultTypes?
+                    | simdLikeInstr
+                    | memLikeInstr
+                    | numericLikeInstr
+                    | 'local.get' index
+                    | 'local.set' index
+                    | 'local.tee' index
+                    | 'global.get' index
+                    | 'global.set' index
+                    | 'table.get' tableidx
+                    | 'table.set' tableidx
+                    | 'table.size' tableidx
+                    | 'table.grow' tableidx
+                    | 'table.fill' tableidx
+                    | 'table.copy' tableidx tableidx
+                    | 'table.init' tableidx elemidx
+                    | 'elem.drop' elemidx
+                    | 'memory.size' memidx?
+                    | 'memory.grow' memidx?
+                    | 'memory.fill' memidx?
+                    | 'memory.copy' memidx? memidx?
+                    | 'memory.init' memidx? dataidx
+                    | 'data.drop' dataidx
+                    | 'ref.null' heaptype
+                    | 'ref.func' funcidx
+                    | 'ref.is_null'
+                    | 'ref.as_non_null'
+                    | 'ref.eq'
+                    | 'ref.test' reftype
+                    | 'ref.cast' reftype
+                    | 'struct.new' typeidx
+                    | 'struct.new_default' typeidx
+                    | 'struct.get' typeidx fieldidx
+                    | 'struct.get_s' typeidx fieldidx
+                    | 'struct.get_u' typeidx fieldidx
+                    | 'struct.set' typeidx fieldidx
+                    | 'array.new' typeidx
+                    | 'array.new_default' typeidx
+                    | 'array.new_fixed' typeidx nat
+                    | 'array.new_data' typeidx dataidx
+                    | 'array.new_elem' typeidx elemidx
+                    | 'array.get' typeidx
+                    | 'array.get_s' typeidx
+                    | 'array.get_u' typeidx
+                    | 'array.set' typeidx
+                    | 'array.len'
+                    | 'array.fill' typeidx
+                    | 'array.copy' typeidx typeidx
+                    | 'array.init_data' typeidx dataidx
+                    | 'array.init_elem' typeidx elemidx
+                    | 'ref.i31'
+                    | 'i31.get_s'
+                    | 'i31.get_u'
+                    | 'any.convert_extern'
+                    | 'extern.convert_any'
+                    | 'call' funcidx
+                    | 'call_ref' typeidx
+                    | 'call_indirect' tableidx? typeuse
+                    | 'return_call' funcidx
+                    | 'return_call_ref' typeidx
+                    | 'return_call_indirect' tableidx? typeuse
+                    | 'br' labelidx
+                    | 'br_if' labelidx
+                    | 'br_table' labelidx+ labelidx
+                    | 'br_on_null' labelidx
+                    | 'br_on_non_null' labelidx
+                    | 'br_on_cast' labelidx reftype reftype
+                    | 'br_on_cast_fail' labelidx reftype reftype
+                    | 'throw' tagidx
+
+/* Numeric/SIMD/load/store: lexer produces dottedName for opcodes like
+ * i32.const, i32.add, f64.sqrt, i32.load, v128.const, i8x16.add, etc.
+ * Uses backtracking: try memarg first, then numeric value, then bare opcode. */
+numericLikeInstr  ::= dottedName memarg
+                    | dottedName float
+                    | dottedName
+
+memLikeInstr      ::= dottedName memarg?
+
+simdLikeInstr     ::= 'v128.const' simdConst
+                    | dottedName laneidx
+                    | 'i8x16.shuffle' laneidx laneidx laneidx laneidx
+                                      laneidx laneidx laneidx laneidx
+                                      laneidx laneidx laneidx laneidx
+                                      laneidx laneidx laneidx laneidx
+
+/* Block type annotation */
+blockType         ::= typeuse | resultTypes | valueType
+
+label             ::= id
+
+/* SIMD lane value sequences */
+simdConst         ::= 'i8x16' signedNat signedNat signedNat signedNat signedNat signedNat signedNat signedNat
+                              signedNat signedNat signedNat signedNat signedNat signedNat signedNat signedNat
+                    | 'i16x8' signedNat signedNat signedNat signedNat signedNat signedNat signedNat signedNat
+                    | 'i32x4' signedNat signedNat signedNat signedNat
+                    | 'i64x2' signedNat signedNat
+                    | 'f32x4' float float float float
+                    | 'f64x2' float float
+
+/* ============================================================================
+ * Type System Constructs
+ * ============================================================================ */
+
+typeuse           ::= '(' 'type' typeidx ')' paramDecl* resultDecl*
+                    | paramDecl+ resultDecl*
+                    | resultDecl+
+paramDecl         ::= '(' 'param' id? valueType+ ')'
+resultDecl        ::= '(' 'result' valueType+ ')'
+resultTypes       ::= '(' 'result' valueType+ ')'
+
+heaptype          ::= 'any' | 'eq' | 'i31' | 'struct' | 'array' | 'none'
+                    | 'func' | 'nofunc' | 'exn' | 'noexn' | 'extern' | 'noextern'
+                    | 'funcref' | 'externref' | 'exnref'
+                    | typeidx
+reftype           ::= '(' 'ref' 'null'? heaptype ')'
+                    | 'funcref' | 'externref' | 'exnref'
+valueType         ::= 'i32' | 'i64' | 'f32' | 'f64' | 'v128' | reftype
+
+/* Indices */
+id                ::= identifier^token
+index             ::= id | nat
+typeidx           ::= index
+funcidx           ::= index
+tableidx          ::= index
+memidx            ::= index
+tagidx            ::= index
+elemidx           ::= index
+dataidx           ::= index
+labelidx          ::= index
+fieldidx          ::= index
+
+signedNat         ::= sign? nat
+
+/* Numeric types */
+nt                ::= 'i32' | 'i64' | 'f32' | 'f64'
+sz                ::= nat
+sx                ::= '_s' | '_u'
+
+limits            ::= addrtype? nat nat?
+addrtype          ::= 'i32' | 'i64'
+
+memarg            ::= 'offset=' nat 'align=' nat
+                    | 'offset=' nat
+                    | 'align=' nat
+laneidx           ::= nat
+
+expr              ::= instr*
+
+/* ============================================================================
+ * Lexical Productions (Tokens)
+ * ============================================================================ */
+
+<?TOKENS?>
+
+idChar            ::= '_' | [0-9] | [A-Za-z] | '.' | '-'
+namePart          ::= [A-Za-z_] [A-Za-z0-9_]*
+
+/* Core tokens */
+eof               ::= $
+whitespace        ::= ( Space | SingleLineComment | MultiLineComment )+
+                   /* ws: definition */
+
+Space             ::= ( #x9 | #xD | #x20 )+ | #xA
+
+SingleLineComment ::= ';;' ( sourceCharacter - lineTerminator )* ( lineTerminator | eof )
+
+MultiLineComment  ::= '(;' ( .* - ( .* ';)' .* ) ) ';)'
+                   | '(;' ( ( .* - ( .* ';)' .* ) ) - ( Space* 'ws' Space* ':' .* ) ) ';)'
+
+sourceCharacter   ::= .
+lineTerminator    ::= #xA | #xD | #x2028 | #x2029
+
+/* Strings */
+string            ::= '"' stringChar* '"'
+stringChar        ::= [#x0009] | [#x000A] | [#x000D] | [#x0020-#x0021] | [#x0023-#x005B]
+                    | [#x005D-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+                    | escapeSequence
+escapeSequence    ::= '\' [#x0000-#xD7FF#xE000-#xFFFD#x10000-#x10FFFF]
+
+/* Numbers */
+integer           ::= '-' digit+
+nat               ::= digit+
+digit             ::= [0-9]
+
+float             ::= sign? digit+ ( '.' digit+ )? ( ( 'e' | 'E' ) sign? digit+ )?
+                    | sign? '0x' hexdigit+ ( '.' hexdigit+ )? ( ( 'p' | 'P' ) sign? digit+ )?
+                    | sign? 'inf'
+                    | sign? 'nan' ( ':' '0x' hexdigit+ )?
+nat << float
+sign              ::= '+' | '-'
+hexdigit          ::= [0-9A-Fa-f]
+
+/* Identifiers and names */
+name              ::= namePart - watKeyword
+identifier        ::= '$' namePart
+dottedName        ::= namePart ( '.' namePart )+
+
+/* Dotted keywords take priority over dottedName (instruction opcodes) */
+dottedName << 'local.get' 'local.set' 'local.tee'
+              'global.get' 'global.set'
+              'table.get' 'table.set' 'table.size' 'table.grow'
+              'table.fill' 'table.copy' 'table.init' 'elem.drop'
+              'memory.size' 'memory.grow' 'memory.fill' 'memory.copy'
+              'memory.init' 'data.drop'
+              'ref.null' 'ref.func' 'ref.is_null' 'ref.as_non_null'
+              'ref.eq' 'ref.test' 'ref.cast' 'ref.i31'
+              'struct.new' 'struct.new_default' 'struct.get' 'struct.get_s'
+              'struct.get_u' 'struct.set'
+              'array.new' 'array.new_default' 'array.new_fixed'
+              'array.new_data' 'array.new_elem' 'array.get' 'array.get_s'
+              'array.get_u' 'array.set' 'array.len' 'array.fill'
+              'array.copy' 'array.init_data' 'array.init_elem'
+              'i31.get_s' 'i31.get_u'
+              'any.convert_extern' 'extern.convert_any'
+              'i8x16.shuffle' 'v128.const'
+
+/* Keywords */
+watKeyword        ::= 'module' | 'type' | 'rec' | 'sub' | 'final' | 'struct' | 'array'
+                    | 'field' | 'func' | 'param' | 'result' | 'local' | 'global'
+                    | 'memory' | 'table' | 'elem' | 'data' | 'import' | 'export'
+                    | 'start' | 'tag' | 'mut' | 'ref' | 'null' | 'offset' | 'item'
+                    | 'block' | 'loop' | 'if' | 'then' | 'else' | 'end'
+                    | 'try_table' | 'catch' | 'catch_ref' | 'catch_all' | 'catch_all_ref'
+                    | 'call' | 'call_ref' | 'call_indirect' | 'return_call'
+                    | 'return_call_ref' | 'return_call_indirect'
+                    | 'br' | 'br_if' | 'br_table' | 'br_on_null' | 'br_on_non_null'
+                    | 'br_on_cast' | 'br_on_cast_fail' | 'return' | 'throw' | 'throw_ref'
+                    | 'nop' | 'unreachable' | 'drop' | 'select'
+                    | 'local.get' | 'local.set' | 'local.tee'
+                    | 'global.get' | 'global.set'
+                    | 'table.get' | 'table.set' | 'table.size' | 'table.grow'
+                    | 'table.fill' | 'table.copy' | 'table.init' | 'elem.drop'
+                    | 'memory.size' | 'memory.grow' | 'memory.fill' | 'memory.copy'
+                    | 'memory.init' | 'data.drop'
+                    | 'load' | 'store'
+                    | 'ref.null' | 'ref.func' | 'ref.is_null' | 'ref.as_non_null'
+                    | 'ref.eq' | 'ref.test' | 'ref.cast' | 'ref.i31'
+                    | 'struct.new' | 'struct.new_default' | 'struct.get' | 'struct.get_s'
+                    | 'struct.get_u' | 'struct.set'
+                    | 'array.new' | 'array.new_default' | 'array.new_fixed'
+                    | 'array.new_data' | 'array.new_elem' | 'array.get' | 'array.get_s'
+                    | 'array.get_u' | 'array.set' | 'array.len' | 'array.fill'
+                    | 'array.copy' | 'array.init_data' | 'array.init_elem'
+                    | 'i31.get_s' | 'i31.get_u'
+                    | 'any.convert_extern' | 'extern.convert_any'
+                    | 'i32' | 'i64' | 'f32' | 'f64' | 'v128'
+                    | 'any' | 'eq' | 'i31' | 'struct' | 'array' | 'none' | 'func'
+                    | 'nofunc' | 'exn' | 'noexn' | 'extern' | 'noextern'
+                    | 'funcref' | 'externref' | 'exnref'
+                    | 'i8x16' | 'i16x8' | 'i32x4' | 'i64x2' | 'f32x4' | 'f64x2'
+                    | 'offset=' | 'align='
+
+EOF               ::= $
