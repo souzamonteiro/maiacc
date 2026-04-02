@@ -875,8 +875,15 @@ class Parser {
       const saveMark = this.markEventState();
       try {
         this.parseLexicalItem();
-        // Stop at production header boundary: Name ::= ...
-        if (this.peek() && this.peek().type === 'TOKEN__3A__3A__3D_') {
+        // Stop at lexical statement boundaries so we don't absorb next headers.
+        const next = this.peek();
+        if (next && (
+          next.type === 'TOKEN__3A__3A__3D_' ||
+          next.type === 'TOKEN__3C__3C_' ||
+          next.type === 'TOKEN__3E__3E_' ||
+          next.type === 'TOKEN__5C__5C_' ||
+          next.type === 'TOKEN__3D__3D_'
+        )) {
           this.position = savePos;
           this.restoreEventState(saveMark);
           break;
@@ -1374,6 +1381,18 @@ class Parser {
       const saveMark = this.markEventState();
       try {
         this.parseNameOrString();
+        const next = this.peek();
+        if (next && (
+          next.type === 'TOKEN__3A__3A__3D_' ||
+          next.type === 'TOKEN__3C__3C_' ||
+          next.type === 'TOKEN__3E__3E_' ||
+          next.type === 'TOKEN__5C__5C_' ||
+          next.type === 'TOKEN__3D__3D_'
+        )) {
+          this.position = savePos;
+          this.restoreEventState(saveMark);
+          break;
+        }
         if (this.position === savePos) break;
         count++;
       } catch(e) {
@@ -1402,6 +1421,18 @@ class Parser {
       const saveMark = this.markEventState();
       try {
         this.parseNameOrString();
+        const next = this.peek();
+        if (next && (
+          next.type === 'TOKEN__3A__3A__3D_' ||
+          next.type === 'TOKEN__3C__3C_' ||
+          next.type === 'TOKEN__3E__3E_' ||
+          next.type === 'TOKEN__5C__5C_' ||
+          next.type === 'TOKEN__3D__3D_'
+        )) {
+          this.position = savePos;
+          this.restoreEventState(saveMark);
+          break;
+        }
         if (this.position === savePos) break;
         count++;
       } catch(e) {

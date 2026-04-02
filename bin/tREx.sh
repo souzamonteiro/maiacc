@@ -20,7 +20,19 @@ then
     exit 1
 fi
 
+# Resolve project paths from this script location so execution works from any cwd.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REX_JS="$PROJECT_ROOT/parser-generator/REx.js"
+PARSER_GENERATOR_JS="$PROJECT_ROOT/parser-generator/parser-generator.js"
+
+if [ ! -f "$REX_JS" ] || [ ! -f "$PARSER_GENERATOR_JS" ]; then
+    echo "Required parser generator files were not found relative to '$SCRIPT_DIR'."
+    exit 1
+fi
+
 INPUT_FORMAT="xml"
+FORMAT_EXPLICIT="false"
 ONLY_XML="false"
 XML_OUTPUT_FILE=""
 
@@ -28,10 +40,12 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --ebnf)
             INPUT_FORMAT="ebnf"
+            FORMAT_EXPLICIT="true"
             shift
             ;;
         --xml)
             INPUT_FORMAT="xml"
+            FORMAT_EXPLICIT="true"
             shift
             ;;
         --only-xml)
@@ -74,6 +88,18 @@ fi
 GRAMMAR_FILE="$1"
 OUTPUT_FILE="${2:-parser.js}"
 
+# If format is not explicitly provided, infer from grammar file extension.
+if [ "$FORMAT_EXPLICIT" = "false" ]; then
+    case "$GRAMMAR_FILE" in
+        *.ebnf|*.EBNF)
+            INPUT_FORMAT="ebnf"
+            ;;
+        *)
+            INPUT_FORMAT="xml"
+            ;;
+    esac
+fi
+
 if [ ! -f "$GRAMMAR_FILE" ]; then
     echo "Grammar file '$GRAMMAR_FILE' not found."
     exit 1
@@ -99,8 +125,8 @@ if [ "$INPUT_FORMAT" = "ebnf" ]; then
     fi
 
     echo "Converting EBNF to XML: '$GRAMMAR_FILE' -> '$XML_OUTPUT_FILE'"
-    node parser-generator/REx.js "$GRAMMAR_FILE" "$XML_OUTPUT_FILE"
-    if [ $? -ne 0 ]; then
+    if ! node "$REX_JS" "$GRAMMAR_FILE" > "$XML_OUTPUT_FILE"; then
+        rm -f "$XML_OUTPUT_FILE"
         echo "Failed to convert EBNF to XML."
         exit 1
     fi
@@ -116,4 +142,4 @@ else
 fi
 
 echo "Generating parser: '$GRAMMAR_XML_FILE' -> '$OUTPUT_FILE'"
-node parser-generator/parser-generator.js "$GRAMMAR_XML_FILE" "$OUTPUT_FILE"
+node "$PARSER_GENERATOR_JS" "$GRAMMAR_XML_FILE" "$OUTPUT_FILE"
