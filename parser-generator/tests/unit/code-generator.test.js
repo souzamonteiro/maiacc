@@ -235,7 +235,7 @@ describe('CodeGenerator.generate – full arithmetic grammar pipeline', () => {
 });
 
 describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
-  it('emits float before nat when grammar has nat << float', () => {
+  it('emits nat before float when grammar has nat << float', () => {
     const rules = new Map();
     rules.set('Start', {
       type: 'syntax',
@@ -270,8 +270,8 @@ describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
       tokens,
       lexicalPreferences: [
         {
-          lower: { kind: 'name', value: 'nat' },
-          higher: { kind: 'name', value: 'float' },
+          lower: { kind: 'name', value: 'float' },
+          higher: { kind: 'name', value: 'nat' },
         },
       ],
       startSymbol: 'Start',
@@ -282,6 +282,6 @@ describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
     const natPos = code.indexOf("type: 'nat'");
     assert.ok(floatPos !== -1, 'float token must be emitted');
     assert.ok(natPos !== -1, 'nat token must be emitted');
-    assert.ok(floatPos < natPos, 'float must be emitted before nat due to nat << float');
+    assert.ok(natPos < floatPos, 'nat must be emitted before float due to nat << float');
   });
 });

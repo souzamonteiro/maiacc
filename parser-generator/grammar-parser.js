@@ -84,9 +84,11 @@ class GrammarParser {
 
       for (const right of rights) {
         if (op === '<<') {
-          edges.push({ lower: left, higher: right });
-        } else {
+          // In REx preferences, A << B means A is preferred over B.
           edges.push({ lower: right, higher: left });
+        } else {
+          // Conversely, A >> B means B is preferred over A.
+          edges.push({ lower: left, higher: right });
         }
       }
     }

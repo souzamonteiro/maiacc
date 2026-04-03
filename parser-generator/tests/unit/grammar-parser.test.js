@@ -298,8 +298,8 @@ describe('GrammarParser – lexical preferences (<< / >>)', () => {
     assert.equal(g.lexicalPreferences.length, 1);
     const rel = g.lexicalPreferences[0];
     assert.equal(rel.lower.kind, 'name');
-    assert.equal(rel.lower.value, 'nat');
+    assert.equal(rel.lower.value, 'float');
     assert.equal(rel.higher.kind, 'name');
-    assert.equal(rel.higher.value, 'float');
+    assert.equal(rel.higher.value, 'nat');
   });
 });
