@@ -233,3 +233,55 @@ describe('CodeGenerator.generate – full arithmetic grammar pipeline', () => {
     assert.ok(!code.includes('}}'), 'Generated code must not contain "}}" (merged braces)');
   });
 });
+
+describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
+  it('emits float before nat when grammar has nat << float', () => {
+    const rules = new Map();
+    rules.set('Start', {
+      type: 'syntax',
+      name: 'Start',
+      sequences: [
+        [{ type: 'nonterminal', value: 'float', quantifier: 'exactly1' }],
+        [{ type: 'nonterminal', value: 'nat', quantifier: 'exactly1' }],
+      ],
+    });
+
+    const tokens = new Map();
+    // Intentionally insert nat first to validate preference-based reordering.
+    tokens.set('nat', {
+      type: 'lexical',
+      name: 'nat',
+      patterns: [[{ type: 'charclass', value: '0-9', negated: false, quantifier: 'oneOrMore' }]],
+      isSkip: false,
+    });
+    tokens.set('float', {
+      type: 'lexical',
+      name: 'float',
+      patterns: [[
+        { type: 'tokenRef', value: 'nat', quantifier: 'exactly1' },
+        { type: 'literal', value: '.', quantifier: 'exactly1' },
+        { type: 'tokenRef', value: 'nat', quantifier: 'exactly1' },
+      ]],
+      isSkip: false,
+    });
+
+    const gen = new CodeGenerator({
+      rules,
+      tokens,
+      lexicalPreferences: [
+        {
+          lower: { kind: 'name', value: 'nat' },
+          higher: { kind: 'name', value: 'float' },
+        },
+      ],
+      startSymbol: 'Start',
+    });
+
+    const code = gen.generateLexer();
+    const floatPos = code.indexOf("type: 'float'");
+    const natPos = code.indexOf("type: 'nat'");
+    assert.ok(floatPos !== -1, 'float token must be emitted');
+    assert.ok(natPos !== -1, 'nat token must be emitted');
+    assert.ok(floatPos < natPos, 'float must be emitted before nat due to nat << float');
+  });
+});

@@ -86,6 +86,41 @@ const CHARCODE_XML =
   '</LexicalDefinition>' +
   '<EOF/></Grammar>';
 
+// Regression fixture: lexical preference nat << float must be parsed and exposed
+const PREFERENCE_XML =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<Grammar><Prolog/>' +
+  '<SyntaxDefinition>' +
+    '<SyntaxProduction>' +
+      '<Name>Start</Name> <TOKEN>::=</TOKEN>' +
+      '<SyntaxChoice><SyntaxSequence>' +
+        '<SyntaxItem><SyntaxPrimary><NameOrString><Name>float</Name></NameOrString></SyntaxPrimary></SyntaxItem>' +
+      '</SyntaxSequence></SyntaxChoice>' +
+    '</SyntaxProduction>' +
+  '</SyntaxDefinition>' +
+  '<LexicalDefinition><TOKEN>&lt;?TOKENS?&gt;</TOKEN>' +
+    '<LexicalProduction>' +
+      '<Name>nat</Name> <TOKEN>::=</TOKEN>' +
+      '<ContextChoice><ContextExpression><LexicalSequence>' +
+        '<LexicalItem><LexicalPrimary><CharClass><TOKEN>[</TOKEN><CharRange>0-9</CharRange><TOKEN>]</TOKEN></CharClass></LexicalPrimary><TOKEN>+</TOKEN></LexicalItem>' +
+      '</LexicalSequence></ContextExpression></ContextChoice>' +
+    '</LexicalProduction>' +
+    '<LexicalProduction>' +
+      '<Name>float</Name> <TOKEN>::=</TOKEN>' +
+      '<ContextChoice><ContextExpression><LexicalSequence>' +
+        '<LexicalItem><LexicalPrimary><Name>nat</Name></LexicalPrimary></LexicalItem>' +
+        '<LexicalItem><LexicalPrimary><StringLiteral>\'.\'</StringLiteral></LexicalPrimary></LexicalItem>' +
+        '<LexicalItem><LexicalPrimary><Name>nat</Name></LexicalPrimary></LexicalItem>' +
+      '</LexicalSequence></ContextExpression></ContextChoice>' +
+    '</LexicalProduction>' +
+    '<Preference>' +
+      '<NameOrString><Name>nat</Name></NameOrString>' +
+      '<TOKEN>&lt;&lt;</TOKEN>' +
+      '<NameOrString><Name>float</Name></NameOrString>' +
+    '</Preference>' +
+  '</LexicalDefinition>' +
+  '<EOF/></Grammar>';
+
 
 // ─── parseCharCode ────────────────────────────────────────────────────────────
 
@@ -253,5 +288,18 @@ describe('GrammarParser – Regression: multiple <CharCode> siblings in one <Cha
     assert.ok(charclassItem, 'Must have a charclass item');
     assert.equal(typeof charclassItem.value, 'string');
     assert.ok(charclassItem.value.length > 0, 'Charclass content must not be empty');
+  });
+});
+
+describe('GrammarParser – lexical preferences (<< / >>)', () => {
+  it('parses nat << float into lexicalPreferences', async () => {
+    const g = await new GrammarParser(PREFERENCE_XML).parse();
+    assert.ok(Array.isArray(g.lexicalPreferences));
+    assert.equal(g.lexicalPreferences.length, 1);
+    const rel = g.lexicalPreferences[0];
+    assert.equal(rel.lower.kind, 'name');
+    assert.equal(rel.lower.value, 'nat');
+    assert.equal(rel.higher.kind, 'name');
+    assert.equal(rel.higher.value, 'float');
   });
 });

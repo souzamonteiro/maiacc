@@ -6,6 +6,7 @@ class GrammarParser {
     this.xmlString = xmlString;
     this.rules = new Map();
     this.tokens = new Map();
+    this.lexicalPreferences = [];
     this.startSymbol = null;
   }
   
@@ -42,13 +43,55 @@ class GrammarParser {
         const token = this.parseLexicalProduction(prod);
         this.tokens.set(token.name, token);
       }
+
+      this.lexicalPreferences = this.parseLexicalPreferences(lexicalDefinition.Preference);
     }
     
     return {
       rules: this.rules,
       tokens: this.tokens,
+      lexicalPreferences: this.lexicalPreferences,
       startSymbol: this.startSymbol
     };
+  }
+
+  parseLexicalPreferences(preferences) {
+    if (!preferences) return [];
+
+    const prefs = Array.isArray(preferences) ? preferences : [preferences];
+    const edges = [];
+
+    const toAtom = (nos) => {
+      if (!nos || typeof nos !== 'object') return null;
+      if (nos.Name) return { kind: 'name', value: nos.Name };
+      if (nos.StringLiteral) return { kind: 'literal', value: this.unescapeString(nos.StringLiteral) };
+      return null;
+    };
+
+    for (const pref of prefs) {
+      const op = pref && pref.TOKEN;
+      if (op !== '<<' && op !== '>>') continue;
+
+      const listRaw = pref && pref.NameOrString;
+      const list = (Array.isArray(listRaw) ? listRaw : [listRaw])
+        .map(toAtom)
+        .filter(Boolean);
+
+      if (list.length < 2) continue;
+
+      const left = list[0];
+      const rights = list.slice(1);
+
+      for (const right of rights) {
+        if (op === '<<') {
+          edges.push({ lower: left, higher: right });
+        } else {
+          edges.push({ lower: right, higher: left });
+        }
+      }
+    }
+
+    return edges;
   }
   
   parseSyntaxProduction(prod) {

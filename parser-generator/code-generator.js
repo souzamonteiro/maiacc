@@ -208,6 +208,7 @@ class CodeGenerator {
     let code = templates.lexerHeader;
     const emitted = new Set();
     const referencedLexicalTokens = this.collectReferencedLexicalTokens();
+    const orderedLexicalNames = this.getOrderedLexicalTokenNames();
     
     // Add literal tokens
     for (const [value, token] of this.tokenMap) {
@@ -220,7 +221,9 @@ class CodeGenerator {
     }
     
     // Add lexical tokens
-    for (const [name, token] of this.grammar.tokens) {
+    for (const name of orderedLexicalNames) {
+      const token = this.grammar.tokens.get(name);
+      if (!token) continue;
       const suppressedContextTokens = new Set(['EOF', 'DirPIContents']);
       const shouldEmit = !suppressedContextTokens.has(name) && (token.isSkip || referencedLexicalTokens.has(name));
       if (shouldEmit && token.patterns.length > 0 && !emitted.has(name)) {
@@ -249,6 +252,59 @@ class CodeGenerator {
     
     code += templates.lexerFooter;
     return code;
+  }
+
+  getOrderedLexicalTokenNames() {
+    const names = [...this.grammar.tokens.keys()];
+    if (names.length <= 1) return names;
+
+    const index = new Map(names.map((n, i) => [n, i]));
+    const adj = new Map(names.map(n => [n, new Set()]));
+    const indeg = new Map(names.map(n => [n, 0]));
+
+    const prefs = Array.isArray(this.grammar.lexicalPreferences)
+      ? this.grammar.lexicalPreferences
+      : [];
+
+    const resolveTokenName = (atom) => {
+      if (!atom) return null;
+      if (atom.kind === 'name') return this.grammar.tokens.has(atom.value) ? atom.value : null;
+      if (atom.kind === 'literal') {
+        // Literal preferences are naturally honored by emitting literal tokens before
+        // lexical tokens. Keep only lexical token names here.
+        return this.grammar.tokens.has(atom.value) ? atom.value : null;
+      }
+      return null;
+    };
+
+    for (const pref of prefs) {
+      const low = resolveTokenName(pref.lower);
+      const high = resolveTokenName(pref.higher);
+      if (!low || !high || low === high) continue;
+      if (!adj.get(high).has(low)) {
+        adj.get(high).add(low);
+        indeg.set(low, indeg.get(low) + 1);
+      }
+    }
+
+    const ready = names.filter(n => indeg.get(n) === 0).sort((a, b) => index.get(a) - index.get(b));
+    const out = [];
+
+    while (ready.length > 0) {
+      const current = ready.shift();
+      out.push(current);
+      const nexts = [...adj.get(current)].sort((a, b) => index.get(a) - index.get(b));
+      for (const next of nexts) {
+        indeg.set(next, indeg.get(next) - 1);
+        if (indeg.get(next) === 0) {
+          ready.push(next);
+          ready.sort((a, b) => index.get(a) - index.get(b));
+        }
+      }
+    }
+
+    // If there is a cycle in preferences, preserve original order as a safe fallback.
+    return out.length === names.length ? out : names;
   }
 
   collectReferencedLexicalTokens() {
