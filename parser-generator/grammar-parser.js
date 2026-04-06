@@ -46,6 +46,8 @@ class GrammarParser {
 
       this.lexicalPreferences = this.parseLexicalPreferences(lexicalDefinition.Preference);
     }
+
+    this.applySyntaxWhitespaceDefinitions();
     
     return {
       rules: this.rules,
@@ -53,6 +55,23 @@ class GrammarParser {
       lexicalPreferences: this.lexicalPreferences,
       startSymbol: this.startSymbol
     };
+  }
+
+  applySyntaxWhitespaceDefinitions() {
+    for (const [, rule] of this.rules) {
+      if (!rule || !Array.isArray(rule.options) || !rule.options.includes('definition')) {
+        continue;
+      }
+
+      for (const sequence of rule.sequences || []) {
+        for (const item of sequence || []) {
+          if (item.type === 'nonterminal' && this.tokens.has(item.value)) {
+            const token = this.tokens.get(item.value);
+            token.isSkip = true;
+          }
+        }
+      }
+    }
   }
 
   parseLexicalPreferences(preferences) {
@@ -252,22 +271,36 @@ class GrammarParser {
   
   parseLexicalSequence(seq) {
     const items = [];
-    
+
     if (!seq || !seq.LexicalItem) {
       return items;
     }
-    
+
     const itemElements = Array.isArray(seq.LexicalItem)
       ? seq.LexicalItem
       : [seq.LexicalItem];
-    
+
+    const separators = seq.TOKEN
+      ? (Array.isArray(seq.TOKEN) ? seq.TOKEN : [seq.TOKEN])
+      : [];
+
+    // REx lexical difference appears as: LexicalItem '-' LexicalItem.
+    // Keep an explicit node so code generation can avoid treating it as concatenation.
+    if (separators.includes('-') && itemElements.length === 2) {
+      const left = this.parseLexicalItem(itemElements[0]);
+      const right = this.parseLexicalItem(itemElements[1]);
+      if (left && right) {
+        return [{ type: 'difference', left, right, quantifier: 'exactly1' }];
+      }
+    }
+
     for (const item of itemElements) {
       const parsedItem = this.parseLexicalItem(item);
       if (parsedItem) {
         items.push(parsedItem);
       }
     }
-    
+
     return items;
   }
   

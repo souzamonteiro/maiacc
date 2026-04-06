@@ -121,6 +121,10 @@ class CodeGenerator {
       } else if (groupAlternatives.length > 1) {
         base = `(?:${groupAlternatives.join('|')})`;
       }
+    } else if (item.type === 'difference') {
+      // Lexical difference (A - B): current generator uses A as matcher baseline.
+      // This avoids accidental concatenation with B and keeps lexing viable.
+      base = this.lexicalItemToRegex(item.left, visiting);
     } else if (item.type === 'anyChar') {
       base = '[\\s\\S]';
     }

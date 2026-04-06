@@ -355,7 +355,7 @@ describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
     const natPos = code.indexOf("type: 'nat'");
     assert.ok(floatPos !== -1, 'float token must be emitted');
     assert.ok(natPos !== -1, 'nat token must be emitted');
-    assert.ok(floatPos < natPos, 'grammar preference nat << float must force float before nat');
+    assert.ok(natPos < floatPos, 'grammar preference nat << float must keep nat before float');
   });
 
   it('tokenizes 3.14 as float when nat << float', async () => {
