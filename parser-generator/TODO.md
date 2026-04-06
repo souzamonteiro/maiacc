@@ -7,16 +7,16 @@ Only the necessary next work for the parser generator.
 - [x] Move parser-code emission snippets from `code-generator.js` into `templates/javascript.js` to reduce hardcoded generation logic.
 - [x] Keep behavior stable after refactor: generator syntax check passes and downstream MaiaWASM parser regeneration succeeds.
 - [x] Downstream integration sanity check completed in MaiaWASM (`assembler/build.sh` + assembler test suite with 10 passed / 0 failed).
-- [ ] Keep P0 token-priority fix open (not solved by this refactor).
+- [x] P0 token-priority fix and regressions covered (`<<` ordering + float vs nat validation).
 
 ## P0 — Fix now
 
-- [ ] Fix lexer token priority generation so grammar precedence is respected.
+- [x] Fix lexer token priority generation so grammar precedence is respected.
   - `<<` must affect emitted matcher order in the generated lexer.
   - Current concrete failure: WAT decimal literals like `f64.const 3.14` are tokenized as `nat` (`3`) plus leftover `.14` instead of `float`.
   - Validate with the WAT grammar case where `float` must win over `nat`.
 
-- [ ] Add regression tests for token-priority conflicts in generated lexers.
+- [x] Add regression tests for token-priority conflicts in generated lexers.
   - Cover `float` vs `nat`.
   - Cover named-token priority declared in the grammar.
   - Fail if generated token order diverges from grammar priority.

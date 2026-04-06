@@ -10,6 +10,17 @@ const path = require('path');
 const ROOT        = path.join(__dirname, '../..');
 const TEMP_PARSER = path.join(__dirname, '_temp_parser.js');
 
+function resolveGrammarXmlPath() {
+  const candidates = [
+    path.join(ROOT, 'examples/grammar.xml'),
+    path.join(ROOT, 'grammar.xml'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  throw new Error('Could not find grammar.xml (checked parser-generator/grammar.xml and parser-generator/examples/grammar.xml)');
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -45,7 +56,7 @@ describe('Integration – generated arithmetic parser', () => {
     const GrammarParser = require(path.join(ROOT, 'grammar-parser'));
     const CodeGenerator = require(path.join(ROOT, 'code-generator'));
 
-    const xml = fs.readFileSync(path.join(ROOT, 'grammar.xml'), 'utf8');
+    const xml = fs.readFileSync(resolveGrammarXmlPath(), 'utf8');
     const grammar = await new GrammarParser(xml).parse();
     const code    = new CodeGenerator(grammar).generate();
 
@@ -99,8 +110,8 @@ describe('Integration – generated arithmetic parser', () => {
     it('empty string',              () => shouldReject(Parser, ''));
     it('alphabetic input',          () => shouldReject(Parser, 'abc'));
     it('starts with operator',      () => shouldReject(Parser, '+5'));
-    it('unknown operator -',        () => shouldReject(Parser, '3-5'));
-    it('unknown operator /',        () => shouldReject(Parser, '3/5'));
+    it('subtraction',               () => shouldParse(Parser, '3-5'));
+    it('division',                  () => shouldParse(Parser, '3/5'));
     it('double operator (3++5)',    () => shouldReject(Parser, '3++5'));
     it('extra closing paren (3+5))', () => shouldReject(Parser, '3+5)'));
   });

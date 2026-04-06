@@ -6,9 +6,21 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs   = require('fs');
 const path = require('path');
+const vm = require('node:vm');
 
 const CodeGenerator = require('../../code-generator');
 const GrammarParser = require('../../grammar-parser');
+
+function resolveGrammarXmlPath() {
+  const candidates = [
+    path.join(__dirname, '../../examples/grammar.xml'),
+    path.join(__dirname, '../../grammar.xml'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  throw new Error('Could not find grammar.xml (checked parser-generator/grammar.xml and parser-generator/examples/grammar.xml)');
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -19,9 +31,58 @@ function makeGen() {
 
 /** Full CodeGenerator built from the committed grammar.xml. */
 async function arithmeticGen() {
-  const xml = fs.readFileSync(path.join(__dirname, '../../grammar.xml'), 'utf8');
+  const xml = fs.readFileSync(resolveGrammarXmlPath(), 'utf8');
   const grammar = await new GrammarParser(xml).parse();
   return new CodeGenerator(grammar);
+}
+
+const PREFERENCE_XML =
+  '<?xml version="1.0" encoding="UTF-8"?>' +
+  '<Grammar><Prolog/>' +
+  '<SyntaxDefinition>' +
+    '<SyntaxProduction>' +
+      '<Name>Start</Name> <TOKEN>::=</TOKEN>' +
+      '<SyntaxChoice>' +
+        '<SyntaxSequence>' +
+          '<SyntaxItem><SyntaxPrimary><NameOrString><Name>float</Name></NameOrString></SyntaxPrimary></SyntaxItem>' +
+        '</SyntaxSequence>' +
+        '<SyntaxSequence>' +
+          '<SyntaxItem><SyntaxPrimary><NameOrString><Name>nat</Name></NameOrString></SyntaxPrimary></SyntaxItem>' +
+        '</SyntaxSequence>' +
+      '</SyntaxChoice>' +
+    '</SyntaxProduction>' +
+  '</SyntaxDefinition>' +
+  '<LexicalDefinition><TOKEN>&lt;?TOKENS?&gt;</TOKEN>' +
+    '<LexicalProduction>' +
+      '<Name>nat</Name> <TOKEN>::=</TOKEN>' +
+      '<ContextChoice><ContextExpression><LexicalSequence>' +
+        '<LexicalItem><LexicalPrimary><CharClass><TOKEN>[</TOKEN><CharRange>0-9</CharRange><TOKEN>]</TOKEN></CharClass></LexicalPrimary><TOKEN>+</TOKEN></LexicalItem>' +
+      '</LexicalSequence></ContextExpression></ContextChoice>' +
+    '</LexicalProduction>' +
+    '<LexicalProduction>' +
+      '<Name>float</Name> <TOKEN>::=</TOKEN>' +
+      '<ContextChoice><ContextExpression><LexicalSequence>' +
+        '<LexicalItem><LexicalPrimary><Name>nat</Name></LexicalPrimary></LexicalItem>' +
+        '<LexicalItem><LexicalPrimary><StringLiteral>\'.\'</StringLiteral></LexicalPrimary></LexicalItem>' +
+        '<LexicalItem><LexicalPrimary><Name>nat</Name></LexicalPrimary></LexicalItem>' +
+      '</LexicalSequence></ContextExpression></ContextChoice>' +
+    '</LexicalProduction>' +
+    '<Preference>' +
+      '<NameOrString><Name>nat</Name></NameOrString>' +
+      '<TOKEN>&lt;&lt;</TOKEN>' +
+      '<NameOrString><Name>float</Name></NameOrString>' +
+    '</Preference>' +
+  '</LexicalDefinition>' +
+  '<EOF/></Grammar>';
+
+function loadGeneratedParser(code) {
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    require,
+  };
+  vm.runInNewContext(code, sandbox);
+  return sandbox.module.exports;
 }
 
 
@@ -283,5 +344,27 @@ describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
     assert.ok(floatPos !== -1, 'float token must be emitted');
     assert.ok(natPos !== -1, 'nat token must be emitted');
     assert.ok(natPos < floatPos, 'nat must be emitted before float due to nat << float');
+  });
+
+  it('honors named-token priority declared in grammar XML', async () => {
+    const grammar = await new GrammarParser(PREFERENCE_XML).parse();
+    const gen = new CodeGenerator(grammar);
+    const code = gen.generateLexer();
+
+    const floatPos = code.indexOf("type: 'float'");
+    const natPos = code.indexOf("type: 'nat'");
+    assert.ok(floatPos !== -1, 'float token must be emitted');
+    assert.ok(natPos !== -1, 'nat token must be emitted');
+    assert.ok(floatPos < natPos, 'grammar preference nat << float must force float before nat');
+  });
+
+  it('tokenizes 3.14 as float when nat << float', async () => {
+    const grammar = await new GrammarParser(PREFERENCE_XML).parse();
+    const code = new CodeGenerator(grammar).generate();
+    const Parser = loadGeneratedParser(code);
+
+    const parser = new Parser('3.14');
+    assert.equal(parser.tokens[0].type, 'float', 'decimal literal must be tokenized as float');
+    assert.equal(parser.tokens[0].value, '3.14');
   });
 });
