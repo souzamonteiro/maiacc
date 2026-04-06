@@ -246,6 +246,165 @@ module.exports = {
   
   // Call rule
   parseRule: `    this.parse{{rule}}();`,
+
+  // Rule body fragments
+  emptyRule: `    // Empty rule`,
+  alternativesHeader: `    const _ruleStart = this.position;
+    let _matched = false;
+`,
+  alternativeTryBlock: `    if (!_matched) {
+      const _ruleMark = this.markEventState();
+      try {
+{{sequence}}        _matched = true;
+      } catch (e) {
+        this.position = _ruleStart;
+        this.restoreEventState(_ruleMark);
+      }
+    }
+`,
+  alternativesFailure: `    if (!_matched) {
+      throw new Error(\`Expected one of: {{count}} alternatives\`);
+    }
+`,
+
+  // Terminal item fragments
+  terminalOptional: `    if (this.match('{{token}}')) { /* optional matched */ }
+`,
+  terminalZeroOrMore: `    while (this.match('{{token}}')) { /* zero or more matched */ }
+`,
+  terminalOneOrMore: `    do { /* one or more matched */ } while (this.match('{{token}}'));
+`,
+  terminalDefault: `    this.consume('{{token}}');
+`,
+
+  // Lexical nonterminal fragments
+  lexicalOptional: `    if (this.match('{{token}}')) { /* optional token matched */ }
+`,
+  lexicalZeroOrMore: `    while (this.match('{{token}}')) { /* zero or more */ }
+`,
+  lexicalOneOrMore: `    this.consume('{{token}}');
+    while (this.match('{{token}}')) { /* one or more */ }
+`,
+  lexicalDefault: `    this.consume('{{token}}');
+`,
+
+  // Nonterminal item fragments
+  nonterminalOptional: `    // Optional: try parsing {{name}}
+    {
+      const savePos = this.position;
+      const saveMark = this.markEventState();
+      try {
+        this.parse{{name}}();
+      } catch(e) {
+        this.position = savePos;
+        this.restoreEventState(saveMark);
+      }
+    }
+`,
+  nonterminalBoundaryCheck: `        // Stop at production header boundary: Name ::= ...
+        if (this.peek() && this.peek().type === 'TOKEN__3A__3A__3D_') {
+          this.position = savePos;
+          this.restoreEventState(saveMark);
+          break;
+        }
+`,
+  nonterminalBoundaryGuardNames: ['SyntaxItem', 'LexicalItem'],
+  nonterminalZeroOrMore: `    while (true) {
+      const savePos = this.position;
+      const saveMark = this.markEventState();
+      try {
+        this.parse{{name}}();
+{{boundaryCheck}}        if (this.position === savePos) break;
+      } catch(e) {
+        this.position = savePos;
+        this.restoreEventState(saveMark);
+        break;
+      }
+    }
+`,
+  nonterminalOneOrMore: `    let count = 0;
+    while (true) {
+      const savePos = this.position;
+      const saveMark = this.markEventState();
+      try {
+        this.parse{{name}}();
+{{boundaryCheck}}        if (this.position === savePos) break;
+        count++;
+      } catch(e) {
+        this.position = savePos;
+        this.restoreEventState(saveMark);
+        break;
+      }
+    }
+    if (count === 0) {
+      throw new Error('Expected at least one {{name}}');
+    }
+`,
+  nonterminalDefault: `    this.parse{{name}}();
+`,
+
+  // Group item fragments
+  groupAlternativesHeader: `      let _matchedAlt = false;
+`,
+  groupAlternativeTryBlock: `      if (!_matchedAlt) {
+        const _altStart = this.position;
+        const _altMark = this.markEventState();
+        try {
+{{sequence}}          _matchedAlt = true;
+        } catch (e) {
+          this.position = _altStart;
+          this.restoreEventState(_altMark);
+        }
+      }
+`,
+  groupAlternativesFailure: `      if (!_matchedAlt) { throw new Error('No group alternative matched'); }
+`,
+  groupZeroOrMore: `    // Group *
+    while (true) {
+      const _loopStart = this.position;
+      const _loopMark = this.markEventState();
+      try {
+{{attempt}}      } catch (e) {
+        this.position = _loopStart;
+        this.restoreEventState(_loopMark);
+        break;
+      }
+      if (this.position === _loopStart) break;
+    }
+`,
+  groupOneOrMore: `    // Group +
+    {
+      let _count = 0;
+      while (true) {
+        const _loopStart = this.position;
+        const _loopMark = this.markEventState();
+        try {
+{{attempt}}        } catch (e) {
+          this.position = _loopStart;
+          this.restoreEventState(_loopMark);
+          break;
+        }
+        if (this.position === _loopStart) break;
+        _count++;
+      }
+      if (_count === 0) throw new Error('Expected at least one group match');
+    }
+`,
+  groupOptional: `    // Group ?
+    {
+      const _optStart = this.position;
+      const _optMark = this.markEventState();
+      try {
+{{attempt}}      } catch (e) {
+        this.position = _optStart;
+        this.restoreEventState(_optMark);
+      }
+    }
+`,
+  groupDefault: `    // Group
+    {
+{{attempt}}    }
+`,
   
   // Parser footer
   parserFooter: `

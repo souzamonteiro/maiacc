@@ -2,6 +2,13 @@
 
 Only the necessary next work for the parser generator.
 
+## Status update (2026-04-06)
+
+- [x] Move parser-code emission snippets from `code-generator.js` into `templates/javascript.js` to reduce hardcoded generation logic.
+- [x] Keep behavior stable after refactor: generator syntax check passes and downstream MaiaWASM parser regeneration succeeds.
+- [x] Downstream integration sanity check completed in MaiaWASM (`assembler/build.sh` + assembler test suite with 10 passed / 0 failed).
+- [ ] Keep P0 token-priority fix open (not solved by this refactor).
+
 ## P0 — Fix now
 
 - [ ] Fix lexer token priority generation so grammar precedence is respected.

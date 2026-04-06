@@ -6,6 +6,20 @@ class CodeGenerator {
     this.grammar = grammar;
     this.tokenMap = this.buildTokenMap();
   }
+
+  renderTemplate(template, values = {}) {
+    let rendered = template;
+    for (const [key, value] of Object.entries(values)) {
+      rendered = rendered.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    }
+    return rendered;
+  }
+
+  getBoundaryCheck(name) {
+    const guarded = new Set(templates.nonterminalBoundaryGuardNames || []);
+    if (!guarded.has(name)) return '';
+    return templates.nonterminalBoundaryCheck || '';
+  }
   
   buildTokenMap() {
     const tokenMap = new Map();
@@ -357,7 +371,7 @@ class CodeGenerator {
   
   generateRuleBody(rule) {
     if (rule.sequences.length === 0) {
-      return '    // Empty rule';
+      return templates.emptyRule;
     }
     
     if (rule.sequences.length === 1) {
@@ -365,8 +379,7 @@ class CodeGenerator {
     }
 
     // Multiple alternatives with backtracking (no early return)
-    let alternatives = '    const _ruleStart = this.position;\n';
-    alternatives += '    let _matched = false;\n';
+    let alternatives = templates.alternativesHeader;
 
     const orderedSequences = [...rule.sequences].sort((a, b) => {
       const aEmpty = a.length === 0;
@@ -377,21 +390,14 @@ class CodeGenerator {
 
     for (let i = 0; i < orderedSequences.length; i++) {
       const seq = orderedSequences[i];
-      alternatives += `    if (!_matched) {\n`;
-      alternatives += `      const _ruleMark = this.markEventState();\n`;
-      alternatives += `      try {\n`;
-      alternatives += this.generateSequence(seq);
-      alternatives += `        _matched = true;\n`;
-      alternatives += `      } catch (e) {\n`;
-      alternatives += `        this.position = _ruleStart;\n`;
-      alternatives += `        this.restoreEventState(_ruleMark);\n`;
-      alternatives += `      }\n`;
-      alternatives += `    }\n`;
+      alternatives += this.renderTemplate(templates.alternativeTryBlock, {
+        sequence: this.generateSequence(seq)
+      });
     }
 
-    alternatives += `    if (!_matched) {\n`;
-    alternatives += `      throw new Error(\`Expected one of: ${rule.sequences.length} alternatives\`);\n`;
-    alternatives += `    }\n`;
+    alternatives += this.renderTemplate(templates.alternativesFailure, {
+      count: String(rule.sequences.length)
+    });
 
     return alternatives;
   }
@@ -424,13 +430,13 @@ class CodeGenerator {
     
     switch (item.quantifier) {
       case 'optional':
-        return `    if (this.match('${tokenName}')) { /* optional matched */ }\n`;
+        return this.renderTemplate(templates.terminalOptional, { token: tokenName });
       case 'zeroOrMore':
-        return `    while (this.match('${tokenName}')) { /* zero or more matched */ }\n`;
+        return this.renderTemplate(templates.terminalZeroOrMore, { token: tokenName });
       case 'oneOrMore':
-        return `    do { /* one or more matched */ } while (this.match('${tokenName}'));\n`;
+        return this.renderTemplate(templates.terminalOneOrMore, { token: tokenName });
       default:
-        return `    this.consume('${tokenName}');\n`;
+        return this.renderTemplate(templates.terminalDefault, { token: tokenName });
     }
   }
   
@@ -439,85 +445,37 @@ class CodeGenerator {
     if (this.grammar.tokens.has(item.value)) {
       switch (item.quantifier) {
         case 'optional':
-          return `    if (this.match('${item.value}')) { /* optional token matched */ }\n`;
+          return this.renderTemplate(templates.lexicalOptional, { token: item.value });
         case 'zeroOrMore':
-          return `    while (this.match('${item.value}')) { /* zero or more */ }\n`;
+          return this.renderTemplate(templates.lexicalZeroOrMore, { token: item.value });
         case 'oneOrMore':
-          return `    this.consume('${item.value}');\n` +
-                 `    while (this.match('${item.value}')) { /* one or more */ }\n`;
+          return this.renderTemplate(templates.lexicalOneOrMore, { token: item.value });
         default:
-          return `    this.consume('${item.value}');\n`;
+          return this.renderTemplate(templates.lexicalDefault, { token: item.value });
       }
     }
 
     switch (item.quantifier) {
       case 'optional':
-        return `    // Optional: try parsing ${item.value}\n` +
-               `    {\n` +
-               `      const savePos = this.position;\n` +
-               `      const saveMark = this.markEventState();\n` +
-               `      try {\n` +
-               `        this.parse${item.value}();\n` +
-               `      } catch(e) {\n` +
-               `        this.position = savePos;\n` +
-               `        this.restoreEventState(saveMark);\n` +
-               `      }\n` +
-               `    }\n`;
+        return this.renderTemplate(templates.nonterminalOptional, { name: item.value });
       case 'zeroOrMore':
         {
-          const boundaryCheck = (item.value === 'SyntaxItem' || item.value === 'LexicalItem')
-            ? `        // Stop at production header boundary: Name ::= ...\n` +
-              `        if (this.peek() && this.peek().type === 'TOKEN__3A__3A__3D_') {\n` +
-              `          this.position = savePos;\n` +
-              `          this.restoreEventState(saveMark);\n` +
-              `          break;\n` +
-              `        }\n`
-            : '';
-        return `    while (true) {\n` +
-               `      const savePos = this.position;\n` +
-           `      const saveMark = this.markEventState();\n` +
-               `      try {\n` +
-               `        this.parse${item.value}();\n` +
-               boundaryCheck +
-               `        if (this.position === savePos) break;\n` +
-               `      } catch(e) {\n` +
-               `        this.position = savePos;\n` +
-           `        this.restoreEventState(saveMark);\n` +
-               `        break;\n` +
-               `      }\n` +
-               `    }\n`;
+          const boundaryCheck = this.getBoundaryCheck(item.value);
+        return this.renderTemplate(templates.nonterminalZeroOrMore, {
+          name: item.value,
+          boundaryCheck
+        });
         }
       case 'oneOrMore':
         {
-          const boundaryCheck = (item.value === 'SyntaxItem' || item.value === 'LexicalItem')
-            ? `        // Stop at production header boundary: Name ::= ...\n` +
-              `        if (this.peek() && this.peek().type === 'TOKEN__3A__3A__3D_') {\n` +
-              `          this.position = savePos;\n` +
-              `          this.restoreEventState(saveMark);\n` +
-              `          break;\n` +
-              `        }\n`
-            : '';
-        return `    let count = 0;\n` +
-               `    while (true) {\n` +
-               `      const savePos = this.position;\n` +
-           `      const saveMark = this.markEventState();\n` +
-               `      try {\n` +
-               `        this.parse${item.value}();\n` +
-               boundaryCheck +
-               `        if (this.position === savePos) break;\n` +
-               `        count++;\n` +
-               `      } catch(e) {\n` +
-               `        this.position = savePos;\n` +
-           `        this.restoreEventState(saveMark);\n` +
-               `        break;\n` +
-               `      }\n` +
-               `    }\n` +
-               `    if (count === 0) {\n` +
-               `      throw new Error('Expected at least one ${item.value}');\n` +
-               `    }\n`;
+          const boundaryCheck = this.getBoundaryCheck(item.value);
+        return this.renderTemplate(templates.nonterminalOneOrMore, {
+          name: item.value,
+          boundaryCheck
+        });
         }
       default:
-        return `    this.parse${item.value}();\n`;
+        return this.renderTemplate(templates.nonterminalDefault, { name: item.value });
     }
   }
   
@@ -527,32 +485,24 @@ class CodeGenerator {
     if (item.sequences.length === 1) {
       attempt += this.generateSequence(item.sequences[0]);
     } else {
-      attempt += '      let _matchedAlt = false;\n';
+      attempt += templates.groupAlternativesHeader;
       for (const seq of item.sequences) {
-        attempt += '      if (!_matchedAlt) {\n';
-        attempt += '        const _altStart = this.position;\n';
-        attempt += '        const _altMark = this.markEventState();\n';
-        attempt += '        try {\n';
-        attempt += this.generateSequence(seq);
-        attempt += '          _matchedAlt = true;\n';
-        attempt += '        } catch (e) {\n';
-        attempt += '          this.position = _altStart;\n';
-        attempt += '          this.restoreEventState(_altMark);\n';
-        attempt += '        }\n';
-        attempt += '      }\n';
+        attempt += this.renderTemplate(templates.groupAlternativeTryBlock, {
+          sequence: this.generateSequence(seq)
+        });
       }
-      attempt += '      if (!_matchedAlt) { throw new Error(\'No group alternative matched\'); }\n';
+      attempt += templates.groupAlternativesFailure;
     }
 
     switch (item.quantifier) {
       case 'zeroOrMore':
-        return `    // Group *\n    while (true) {\n      const _loopStart = this.position;\n      const _loopMark = this.markEventState();\n      try {\n${attempt}      } catch (e) {\n        this.position = _loopStart;\n        this.restoreEventState(_loopMark);\n        break;\n      }\n      if (this.position === _loopStart) break;\n    }\n`;
+        return this.renderTemplate(templates.groupZeroOrMore, { attempt });
       case 'oneOrMore':
-        return `    // Group +\n    {\n      let _count = 0;\n      while (true) {\n        const _loopStart = this.position;\n        const _loopMark = this.markEventState();\n        try {\n${attempt}        } catch (e) {\n          this.position = _loopStart;\n          this.restoreEventState(_loopMark);\n          break;\n        }\n        if (this.position === _loopStart) break;\n        _count++;\n      }\n      if (_count === 0) throw new Error('Expected at least one group match');\n    }\n`;
+        return this.renderTemplate(templates.groupOneOrMore, { attempt });
       case 'optional':
-        return `    // Group ?\n    {\n      const _optStart = this.position;\n      const _optMark = this.markEventState();\n      try {\n${attempt}      } catch (e) {\n        this.position = _optStart;\n        this.restoreEventState(_optMark);\n      }\n    }\n`;
+        return this.renderTemplate(templates.groupOptional, { attempt });
       default:
-        return `    // Group\n    {\n${attempt}    }\n`;
+        return this.renderTemplate(templates.groupDefault, { attempt });
     }
   }
   
