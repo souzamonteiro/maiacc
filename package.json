@@ -1,0 +1,55 @@
+{
+  "name": "maiacc",
+  "version": "1.0.0",
+  "description": "MaiaCC (tREx): EBNF/XML to JavaScript lexer/parser generator.",
+  "license": "Apache-2.0",
+  "main": "parser-generator/parser-generator.js",
+  "bin": {
+    "trex": "bin/tREx.sh"
+  },
+  "files": [
+    "bin/tREx.sh",
+    "grammar/REx.ebnf",
+    "grammar/REx.xml",
+    "parser-generator/parser-generator.js",
+    "parser-generator/grammar-parser.js",
+    "parser-generator/code-generator.js",
+    "parser-generator/parse-tree-collector.js",
+    "parser-generator/REx.js",
+    "parser-generator/rex-parser.js",
+    "parser-generator/templates/javascript.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "generate": "node parser-generator/parser-generator.js",
+    "build": "bash parser-generator/build.sh",
+    "test": "npm --prefix parser-generator test",
+    "selfhost:test": "bash bin/tREx.sh --help"
+  },
+  "dependencies": {
+    "xml2js": "^0.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/souzamonteiro/maiacc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/souzamonteiro/maiacc/issues"
+  },
+  "homepage": "https://github.com/souzamonteiro/maiacc#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "parser",
+    "generator",
+    "ebnf",
+    "grammar",
+    "lexer",
+    "trex"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
