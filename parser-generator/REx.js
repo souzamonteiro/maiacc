@@ -12,7 +12,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const ROOT = __dirname;
-const EBNF_ROOT = path.join(ROOT, '..');
+const EBNF_ROOT = path.join(ROOT, '../tools');
 const SELF_HOSTED_PARSER = path.join(ROOT, 'rex-parser.js');
 const LEGACY_REX_MAIN = path.join(EBNF_ROOT, 'REx-main.js');
 
