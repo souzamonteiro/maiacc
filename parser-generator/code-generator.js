@@ -122,9 +122,21 @@ class CodeGenerator {
         base = `(?:${groupAlternatives.join('|')})`;
       }
     } else if (item.type === 'difference') {
-      // Lexical difference (A - B): current generator uses A as matcher baseline.
-      // This avoids accidental concatenation with B and keeps lexing viable.
-      base = this.lexicalItemToRegex(item.left, visiting);
+      // Lexical difference (A - B)
+      const lft = item.left;
+      const rgt = item.right;
+      if (
+        lft.type === 'anyChar' && lft.quantifier === 'exactly1' &&
+        rgt.type === 'literal' && rgt.quantifier === 'exactly1' && rgt.value.length === 1
+      ) {
+        // Simple single-char exclusion: any char except the given literal → [^char]
+        const ch = rgt.value;
+        const esc = /[\]\\^-]/.test(ch) ? '\\' + ch : ch;
+        base = `[^${esc}]`;
+      } else {
+        // Complex or unsupported difference: fall back to matching A (original behaviour)
+        base = this.lexicalItemToRegex(lft, visiting);
+      }
     } else if (item.type === 'anyChar') {
       base = '[\\s\\S]';
     }
