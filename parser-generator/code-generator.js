@@ -176,8 +176,9 @@ class CodeGenerator {
         if (!Array.isArray(pattern) || pattern.length === 0) continue;
         if (pattern.length === 1) {
           const item = pattern[0];
-          if (item.type === 'literal' && item.value.length === 1) {
-            chars.push(item.value);
+          if (item.type === 'literal') {
+            const ch = this.decodeSingleLiteralChar(item.value);
+            if (ch != null) chars.push(ch);
           } else if (item.type === 'tokenRef' && item.value === 'LineTerminator') {
             chars.push('\n', '\r', '\u2028', '\u2029');
           }
@@ -192,6 +193,13 @@ class CodeGenerator {
       if (ch === '\u2028') return '\\u2028';
       if (ch === '\u2029') return '\\u2029';
       return /[\]\\^-]/.test(ch) ? '\\' + ch : ch;
+    }
+
+    decodeSingleLiteralChar(value) {
+      if (typeof value !== 'string' || value.length === 0) return null;
+      if (value.length === 1) return value;
+      if (value === '\\\\') return '\\';
+      return null;
     }
   
   escapeRegex(str) {
