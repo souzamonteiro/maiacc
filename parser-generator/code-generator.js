@@ -133,6 +133,20 @@ class CodeGenerator {
         const ch = rgt.value;
         const esc = /[\]\\^-]/.test(ch) ? '\\' + ch : ch;
         base = `[^${esc}]`;
+      } else if (
+        lft.type === 'anyChar' && lft.quantifier === 'exactly1' &&
+        rgt.type === 'group'
+      ) {
+        // anyChar - group: exclude all single-char literals and known token refs in the group
+        const excluded = this.extractLiteralsFromGroup(rgt);
+        if (excluded.length > 0) {
+          const charClass = excluded
+            .map(ch => /[\]\\^-]/.test(ch) ? '\\' + ch : ch)
+            .join('');
+          base = `[^${charClass}]`;
+        } else {
+          base = this.lexicalItemToRegex(lft, visiting);
+        }
       } else {
         // Complex or unsupported difference: fall back to matching A (original behaviour)
         base = this.lexicalItemToRegex(lft, visiting);
@@ -154,6 +168,22 @@ class CodeGenerator {
         return base;
     }
   }
+    extractLiteralsFromGroup(group) {
+      if (!group || group.type !== 'group' || !group.patterns) return [];
+      const chars = [];
+      for (const pattern of group.patterns) {
+        if (!Array.isArray(pattern) || pattern.length === 0) continue;
+        if (pattern.length === 1) {
+          const item = pattern[0];
+          if (item.type === 'literal' && item.value.length === 1) {
+            chars.push(item.value);
+          } else if (item.type === 'tokenRef' && item.value === 'LineTerminator') {
+            chars.push('\n', '\r', '\u2028', '\u2029');
+          }
+        }
+      }
+      return chars;
+    }
   
   escapeRegex(str) {
     let escaped = '';
