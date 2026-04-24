@@ -4,6 +4,12 @@
 
 A JavaScript parser generator that reads XML produced from EBNF grammars and emits a working JavaScript lexer/parser.
 
+## Process Documentation
+
+Mandatory cross-repository synchronization workflow:
+
+- [docs/Maia_Ecosystem_Synchronization_Protocol.md](docs/Maia_Ecosystem_Synchronization_Protocol.md)
+
 # MaiaCC tREx
 
 `tREx.sh` is a wrapper script that can:

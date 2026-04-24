@@ -4,7 +4,46 @@ class Lexer {
     this.position = 0;
     this.tokens = [];
     this.charClassDepth = 0;
-    this.tokenPatterns = [    { type: 'TOKEN__3C__3F_', regex: /^<\?/ },    { type: 'TOKEN__3F__3E_', regex: /^\?>/ },    { type: 'TOKEN__3A__3A__3D_', regex: /^::=/ },    { type: 'TOKEN__7C_', regex: /^\|/ },    { type: 'TOKEN__2F_', regex: /^\// },    { type: 'TOKEN__3F_', regex: /^\?/ },    { type: 'TOKEN__2A_', regex: /^\*/ },    { type: 'TOKEN__2B_', regex: /^\+/ },    { type: 'TOKEN__28_', regex: /^\(/ },    { type: 'TOKEN__29_', regex: /^\)/ },    { type: 'TOKEN__3C__3F_TOKENS_3F__3E_', regex: /^<\?TOKENS\?>/ },    { type: 'TOKEN__2E_', regex: /^\./ },    { type: 'TOKEN__26_', regex: /^&/ },    { type: 'TOKEN__2D_', regex: /^-/ },    { type: 'TOKEN__24_', regex: /^\$/ },    { type: 'TOKEN__5B_', regex: /^\[/ },    { type: 'TOKEN__5B__5E_', regex: /^\[\^/ },    { type: 'TOKEN__5D_', regex: /^\]/ },    { type: 'TOKEN__2F__2A_', regex: /^\/\*/ },    { type: 'TOKEN_ws', regex: /^ws/ },    { type: 'TOKEN__3A_', regex: /^:/ },    { type: 'TOKEN_explicit', regex: /^explicit/ },    { type: 'TOKEN_definition', regex: /^definition/ },    { type: 'TOKEN__2A__2F_', regex: /^\*\// },    { type: 'TOKEN__3E__3E_', regex: /^>>/ },    { type: 'TOKEN__3C__3C_', regex: /^<</ },    { type: 'TOKEN__5C__5C_', regex: /^\\\\/ },    { type: 'TOKEN__3D__3D_', regex: /^==/ },    { type: 'TOKEN__3C__3F_ENCORE_3F__3E_', regex: /^<\?ENCORE\?>/ },    { type: 'Name', regex: /^(?:[A-Z]|_|[a-z]|[À-Ö]|[Ø-ö]|[ø-˿]|[Ͱ-ͽ]|[Ϳ-῿]|[‌-‍]|[⁰-↏]|[Ⰰ-⿯]|[、-퟿]|[豈-﷏]|[ﷰ-�])(?:(?:(?:[A-Z]|_|[a-z]|[À-Ö]|[Ø-ö]|[ø-˿]|[Ͱ-ͽ]|[Ϳ-῿]|[‌-‍]|[⁰-↏]|[Ⰰ-⿯]|[、-퟿]|[豈-﷏]|[ﷰ-�])|-|\.|[0-9]|·|[̀-ͯ]|[‿-⁀]))*/ },    { type: 'Space', regex: /^(?:(?:(?:\u0009|\u000d| ))+|\u000a)/ },    { type: 'StringLiteral', regex: /^(?:"(?:[^"\u0009\u000a\u000d])*"|'(?:[^'\u0009\u000a\u000d])*')/ },    { type: 'CaretName', regex: /^\^(?:(?:[A-Z]|_|[a-z]|[À-Ö]|[Ø-ö]|[ø-˿]|[Ͱ-ͽ]|[Ϳ-῿]|[‌-‍]|[⁰-↏]|[Ⰰ-⿯]|[、-퟿]|[豈-﷏]|[ﷰ-�])(?:(?:(?:[A-Z]|_|[a-z]|[À-Ö]|[Ø-ö]|[ø-˿]|[Ͱ-ͽ]|[Ϳ-῿]|[‌-‍]|[⁰-↏]|[Ⰰ-⿯]|[、-퟿]|[豈-﷏]|[ﷰ-�])|-|\.|[0-9]|·|[̀-ͯ]|[‿-⁀]))*)?/ },    { type: 'CharCode', regex: /^#x(?:[0-9a-fA-F])+/ },    { type: 'Char', regex: /^(?:[^\u0009\u000a\u000d#\]]|#)/ },    { type: 'CharRange', regex: /^(?:[^\u0009\u000a\u000d#\]]|#)-(?:[^\u0009\u000a\u000d#\]]|#)/ },    { type: 'CharCodeRange', regex: /^#x(?:[0-9a-fA-F])+-#x(?:[0-9a-fA-F])+/ },    { type: 'skip', regex: /^(?:[\u0009\u000A\u000D\u0020]+|\/\/[^\n]*\n?|\/\*(?!\s*ws\s*:)[\s\S]*?\*\/)+/, skip: true },    ];
+    this.templateDepth = 0;
+    this.tokenPatterns = [    { type: 'TOKEN__3C__3F_', regex: /^<\?/ },    { type: 'TOKEN__3F__3E_', regex: /^\?>/ },    { type: 'TOKEN__3A__3A__3D_', regex: /^::=/ },    { type: 'TOKEN__7C_', regex: /^\|/ },    { type: 'TOKEN__2F_', regex: /^\// },    { type: 'TOKEN__3F_', regex: /^\?/ },    { type: 'TOKEN__2A_', regex: /^\*/ },    { type: 'TOKEN__2B_', regex: /^\+/ },    { type: 'TOKEN__28_', regex: /^\(/ },    { type: 'TOKEN__29_', regex: /^\)/ },    { type: 'TOKEN__3C__3F_TOKENS_3F__3E_', regex: /^<\?TOKENS\?>/ },    { type: 'TOKEN__2E_', regex: /^\./ },    { type: 'TOKEN__26_', regex: /^&/ },    { type: 'TOKEN__2D_', regex: /^-/ },    { type: 'TOKEN__24_', regex: /^\$/ },    { type: 'TOKEN__5B_', regex: /^\[/ },    { type: 'TOKEN__5B__5E_', regex: /^\[\^/ },    { type: 'TOKEN__5D_', regex: /^\]/ },    { type: 'TOKEN__2F__2A_', regex: /^\/\*/ },    { type: 'TOKEN_ws', regex: /^ws/ },    { type: 'TOKEN__3A_', regex: /^:/ },    { type: 'TOKEN_explicit', regex: /^explicit/ },    { type: 'TOKEN_definition', regex: /^definition/ },    { type: 'TOKEN__2A__2F_', regex: /^\*\// },    { type: 'TOKEN__3E__3E_', regex: /^>>/ },    { type: 'TOKEN__3C__3C_', regex: /^<</ },    { type: 'TOKEN__5C__5C_', regex: /^\\\\/ },    { type: 'TOKEN__3D__3D_', regex: /^==/ },    { type: 'TOKEN__3C__3F_ENCORE_3F__3E_', regex: /^<\?ENCORE\?>/ },    { type: 'Name', regex: /^(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])(?:(?:(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])|-|\.|[0-9]|·|[\u0300-\u036f]|[\u203f-\u2040]))*/ },    { type: 'Space', regex: /^(?:(?:(?:\u0009|\u000d| ))+|\u000a)/ },    { type: 'StringLiteral', regex: /^(?:"(?:[^"\u0009\u000a\u000d])*"|'(?:[^'\u0009\u000a\u000d])*')/ },    { type: 'CaretName', regex: /^\^(?:(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])(?:(?:(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])|-|\.|[0-9]|·|[\u0300-\u036f]|[\u203f-\u2040]))*)?/ },    { type: 'CharCode', regex: /^#x(?:[0-9a-fA-F])+/ },    { type: 'Char', regex: /^(?:[^\u0009\u000a\u000d#]]|#)/ },    { type: 'CharRange', regex: /^(?:[^\u0009\u000a\u000d#]]|#)-(?:[^\u0009\u000a\u000d#]]|#)/ },    { type: 'CharCodeRange', regex: /^#x(?:[0-9a-fA-F])+-#x(?:[0-9a-fA-F])+/ },    { type: 'skip', regex: /^(?:[\u0009\u000A\u000D\u0020]+|\/\/[^\n]*\n?|\/\*(?!\s*ws\s*:)[\s\S]*?\*\/)+/, skip: true },    ];
+  }
+
+  isTemplateSpanPattern(pos, kind) {
+    // Deterministic scan to avoid regex escaping issues in generated code.
+    if (this.input[pos] !== '}') return false;
+    const BACKTICK = String.fromCharCode(96);
+    const max = Math.min(this.input.length, pos + 256);
+    let i = pos + 1;
+    while (i < max) {
+      const ch = this.input[i];
+      const next = this.input[i + 1];
+
+      if (ch === '\\') {
+        i += 2;
+        continue;
+      }
+
+      if (ch === '$' && next === '{') {
+        return kind === 'TemplateMiddle';
+      }
+
+      if (ch === BACKTICK) {
+        return kind === 'TemplateTail';
+      }
+
+      i++;
+    }
+    return false;
+  }
+
+  enterTemplateSpan() {
+    this.templateDepth++;
+  }
+
+  exitTemplateSpan() {
+    if (this.templateDepth > 0) {
+      this.templateDepth--;
+    }
   }
   
   tokenize() {
@@ -18,19 +57,35 @@ class Lexer {
       );
 
       for (const pattern of this.tokenPatterns) {
+        // Template middle/tail tokens are context-sensitive and must only
+        // be considered while lexing inside an active template expression.
+        if ((pattern.type === 'TemplateMiddle' || pattern.type === 'TemplateTail') && this.templateDepth === 0) {
+          continue;
+        }
+
         const regex = pattern.regex;
         const match = this.input.substring(this.position).match(regex);
 
         if (match && match.index === 0 && match[0].length > 0) {
-          candidates.push({ pattern, match });
+          let effectivePattern = pattern;
+          // When parsing template expressions, disambiguate closing brace as template span boundary.
+          if (this.templateDepth > 0 && pattern.type === 'TOKEN__7D_') {
+            if (this.isTemplateSpanPattern(this.position, 'TemplateMiddle')) {
+              effectivePattern = { ...pattern, type: 'TemplateMiddle' };
+            } else if (this.isTemplateSpanPattern(this.position, 'TemplateTail')) {
+              effectivePattern = { ...pattern, type: 'TemplateTail' };
+            }
+          }
+
+          candidates.push({ pattern: effectivePattern, match });
           if (!bestMatch
               || match[0].length > bestMatch[0].length
-              || (match[0].length === bestMatch[0].length && pattern.skip && !bestPattern.skip)
+              || (match[0].length === bestMatch[0].length && effectivePattern.skip && !bestPattern.skip)
               || (match[0].length === bestMatch[0].length
                   && bestPattern
                   && isGenericNameType(bestPattern.type)
-                  && !isGenericNameType(pattern.type))) {
-            bestPattern = pattern;
+                  && !isGenericNameType(effectivePattern.type))) {
+            bestPattern = effectivePattern;
             bestMatch = match;
           }
         }
@@ -86,6 +141,10 @@ class Lexer {
           this.charClassDepth++;
         } else if (bestPattern.type === 'TOKEN__5D_' && this.charClassDepth > 0) {
           this.charClassDepth--;
+        } else if (bestPattern.type === 'TemplateHead') {
+          this.enterTemplateSpan();
+        } else if (bestPattern.type === 'TemplateTail') {
+          this.exitTemplateSpan();
         }
       }
 
@@ -875,15 +934,8 @@ class Parser {
       const saveMark = this.markEventState();
       try {
         this.parseLexicalItem();
-        // Stop at lexical statement boundaries so we don't absorb next headers.
-        const next = this.peek();
-        if (next && (
-          next.type === 'TOKEN__3A__3A__3D_' ||
-          next.type === 'TOKEN__3C__3C_' ||
-          next.type === 'TOKEN__3E__3E_' ||
-          next.type === 'TOKEN__5C__5C_' ||
-          next.type === 'TOKEN__3D__3D_'
-        )) {
+        // Stop at production header boundary: Name ::= ...
+        if (this.peek() && this.peek().type === 'TOKEN__3A__3A__3D_') {
           this.position = savePos;
           this.restoreEventState(saveMark);
           break;
@@ -1381,18 +1433,6 @@ class Parser {
       const saveMark = this.markEventState();
       try {
         this.parseNameOrString();
-        const next = this.peek();
-        if (next && (
-          next.type === 'TOKEN__3A__3A__3D_' ||
-          next.type === 'TOKEN__3C__3C_' ||
-          next.type === 'TOKEN__3E__3E_' ||
-          next.type === 'TOKEN__5C__5C_' ||
-          next.type === 'TOKEN__3D__3D_'
-        )) {
-          this.position = savePos;
-          this.restoreEventState(saveMark);
-          break;
-        }
         if (this.position === savePos) break;
         count++;
       } catch(e) {
@@ -1421,18 +1461,6 @@ class Parser {
       const saveMark = this.markEventState();
       try {
         this.parseNameOrString();
-        const next = this.peek();
-        if (next && (
-          next.type === 'TOKEN__3A__3A__3D_' ||
-          next.type === 'TOKEN__3C__3C_' ||
-          next.type === 'TOKEN__3E__3E_' ||
-          next.type === 'TOKEN__5C__5C_' ||
-          next.type === 'TOKEN__3D__3D_'
-        )) {
-          this.position = savePos;
-          this.restoreEventState(saveMark);
-          break;
-        }
         if (this.position === savePos) break;
         count++;
       } catch(e) {
