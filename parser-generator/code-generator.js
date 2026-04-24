@@ -131,17 +131,18 @@ class CodeGenerator {
       ) {
         // Simple single-char exclusion: any char except the given literal → [^char]
         const ch = rgt.value;
-        const esc = /[\]\\^-]/.test(ch) ? '\\' + ch : ch;
+        const esc = this.escapeCharClassChar(ch);
         base = `[^${esc}]`;
       } else if (
-        lft.type === 'anyChar' && lft.quantifier === 'exactly1' &&
+        (lft.type === 'anyChar' || (lft.type === 'tokenRef' && lft.value === 'SourceCharacter')) &&
+        lft.quantifier === 'exactly1' &&
         rgt.type === 'group'
       ) {
         // anyChar - group: exclude all single-char literals and known token refs in the group
         const excluded = this.extractLiteralsFromGroup(rgt);
         if (excluded.length > 0) {
           const charClass = excluded
-            .map(ch => /[\]\\^-]/.test(ch) ? '\\' + ch : ch)
+            .map(ch => this.escapeCharClassChar(ch))
             .join('');
           base = `[^${charClass}]`;
         } else {
@@ -183,6 +184,14 @@ class CodeGenerator {
         }
       }
       return chars;
+    }
+
+    escapeCharClassChar(ch) {
+      if (ch === '\n') return '\\n';
+      if (ch === '\r') return '\\r';
+      if (ch === '\u2028') return '\\u2028';
+      if (ch === '\u2029') return '\\u2029';
+      return /[\]\\^-]/.test(ch) ? '\\' + ch : ch;
     }
   
   escapeRegex(str) {
