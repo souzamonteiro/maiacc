@@ -7,6 +7,7 @@ module.exports = {
     this.position = 0;
     this.tokens = [];
     this.charClassDepth = 0;
+    this.templateDepth = 0;
     this.tokenPatterns = [`,
   
   // Token definition
@@ -17,6 +18,44 @@ module.exports = {
   
   // Lexer footer
   lexerFooter: `    ];
+  }
+
+  isTemplateSpanPattern(pos, kind) {
+    // Deterministic scan to avoid regex escaping issues in generated code.
+    if (this.input[pos] !== '}') return false;
+    const BACKTICK = String.fromCharCode(96);
+    const max = Math.min(this.input.length, pos + 256);
+    let i = pos + 1;
+    while (i < max) {
+      const ch = this.input[i];
+      const next = this.input[i + 1];
+
+      if (ch === '\\\\') {
+        i += 2;
+        continue;
+      }
+
+      if (ch === '$' && next === '{') {
+        return kind === 'TemplateMiddle';
+      }
+
+      if (ch === BACKTICK) {
+        return kind === 'TemplateTail';
+      }
+
+      i++;
+    }
+    return false;
+  }
+
+  enterTemplateSpan() {
+    this.templateDepth++;
+  }
+
+  exitTemplateSpan() {
+    if (this.templateDepth > 0) {
+      this.templateDepth--;
+    }
   }
   
   tokenize() {
@@ -34,15 +73,25 @@ module.exports = {
         const match = this.input.substring(this.position).match(regex);
 
         if (match && match.index === 0 && match[0].length > 0) {
-          candidates.push({ pattern, match });
+          let effectivePattern = pattern;
+          // When parsing template expressions, disambiguate closing brace as template span boundary.
+          if (this.templateDepth > 0 && pattern.type === 'TOKEN__7D_') {
+            if (this.isTemplateSpanPattern(this.position, 'TemplateMiddle')) {
+              effectivePattern = { ...pattern, type: 'TemplateMiddle' };
+            } else if (this.isTemplateSpanPattern(this.position, 'TemplateTail')) {
+              effectivePattern = { ...pattern, type: 'TemplateTail' };
+            }
+          }
+
+          candidates.push({ pattern: effectivePattern, match });
           if (!bestMatch
               || match[0].length > bestMatch[0].length
-              || (match[0].length === bestMatch[0].length && pattern.skip && !bestPattern.skip)
+              || (match[0].length === bestMatch[0].length && effectivePattern.skip && !bestPattern.skip)
               || (match[0].length === bestMatch[0].length
                   && bestPattern
                   && isGenericNameType(bestPattern.type)
-                  && !isGenericNameType(pattern.type))) {
-            bestPattern = pattern;
+                  && !isGenericNameType(effectivePattern.type))) {
+            bestPattern = effectivePattern;
             bestMatch = match;
           }
         }
@@ -98,6 +147,10 @@ module.exports = {
           this.charClassDepth++;
         } else if (bestPattern.type === 'TOKEN__5D_' && this.charClassDepth > 0) {
           this.charClassDepth--;
+        } else if (bestPattern.type === 'TemplateHead') {
+          this.enterTemplateSpan();
+        } else if (bestPattern.type === 'TemplateTail') {
+          this.exitTemplateSpan();
         }
       }
 
