@@ -43,8 +43,17 @@ done
 
 INPUT_EBNF="${INPUT_EBNF:-$SCRIPT_DIR/../grammar/REx.ebnf}"
 OUTPUT_XML="$SCRIPT_DIR/rex-grammar-selfhost.xml"
-OUTPUT_PARSER_TMP="$SCRIPT_DIR/rex-parser-next.js"
+OUTPUT_PARSER_TMP="$(mktemp "$SCRIPT_DIR/rex-parser-candidate.XXXXXX")"
+OUTPUT_PARSER_SAFE="$SCRIPT_DIR/rex-parser-next.js"
 OUTPUT_PARSER_FINAL="$SCRIPT_DIR/rex-parser.js"
+
+cleanup_tmp() {
+	if [ -n "${OUTPUT_PARSER_TMP:-}" ] && [ -f "$OUTPUT_PARSER_TMP" ]; then
+		rm -f "$OUTPUT_PARSER_TMP"
+	fi
+}
+
+trap cleanup_tmp EXIT
 
 if ! command -v node >/dev/null 2>&1; then
 	echo "Node.js is not installed. Please install it to run this build."
@@ -66,7 +75,8 @@ echo "[3/4] Validating generated parser..."
 node -e "const fs=require('fs'); const Parser=require('$OUTPUT_PARSER_TMP'); const input=fs.readFileSync('$INPUT_EBNF','utf8'); new Parser(input).parse(); console.log('Validation OK: generated parser parsed the input grammar.');"
 
 if [ "$NO_PROMOTE" = "true" ]; then
-	echo "[4/4] No promote mode enabled. Keeping generated parser as rex-parser-next.js"
+	echo "[4/4] No promote mode enabled. Writing candidate parser to rex-parser-next.js"
+	cp -f "$OUTPUT_PARSER_TMP" "$OUTPUT_PARSER_SAFE"
 else
 	echo "[4/4] Promoting generated parser to rex-parser.js..."
 	mv -f "$OUTPUT_PARSER_TMP" "$OUTPUT_PARSER_FINAL"
@@ -75,7 +85,7 @@ fi
 echo "Build completed successfully."
 echo "Generated XML: $OUTPUT_XML"
 if [ "$NO_PROMOTE" = "true" ]; then
-	echo "Generated parser (not promoted): $OUTPUT_PARSER_TMP"
+	echo "Generated parser (not promoted): $OUTPUT_PARSER_SAFE"
 else
 	echo "Generated parser: $OUTPUT_PARSER_FINAL"
 fi

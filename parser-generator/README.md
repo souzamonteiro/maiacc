@@ -98,9 +98,15 @@ node -e "const fs=require('fs');const Parser=require('./rex-parser');const input
 # Full self-hosted build (promotes parser to rex-parser.js)
 npm run build:selfhost
 
-# Safe mode (does not overwrite rex-parser.js)
+# Safe mode (does not overwrite rex-parser.js; writes candidate to rex-parser-next.js)
 npm run build:safe
 ```
+
+Behavior details:
+
+- Default build uses a temporary candidate parser file for validation and then promotes it directly to `rex-parser.js`.
+- No persistent "transition parser" file is kept in the default flow.
+- `build:safe` (`--no-promote`) is the explicit review mode that writes `rex-parser-next.js` for manual inspection.
 
 ---
 
