@@ -18,38 +18,6 @@ module.exports = {
   
   // Lexer footer
   lexerFooter: `    ];
-    this.lineStarts = [0];
-    for (let i = 0; i < this.input.length; i++) {
-      if (this.input[i] === '\\n') {
-        this.lineStarts.push(i + 1);
-      }
-    }
-  }
-
-  getLineColumn(offset) {
-    const clamped = Math.max(0, Math.min(Number(offset) || 0, this.input.length));
-    let low = 0;
-    let high = this.lineStarts.length - 1;
-
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      const start = this.lineStarts[mid];
-      const next = mid + 1 < this.lineStarts.length ? this.lineStarts[mid + 1] : this.input.length + 1;
-
-      if (clamped < start) {
-        high = mid - 1;
-      } else if (clamped >= next) {
-        low = mid + 1;
-      } else {
-        return {
-          line: mid + 1,
-          column: clamped - start + 1,
-          offset: clamped
-        };
-      }
-    }
-
-    return { line: 1, column: clamped + 1, offset: clamped };
   }
 
   isTemplateSpanPattern(pos, kind) {
@@ -169,22 +137,15 @@ module.exports = {
       }
 
       if (!bestMatch) {
-        const loc = this.getLineColumn(this.position);
-        throw new Error(\`Unexpected character at line \${loc.line}, column \${loc.column} (offset \${loc.offset}): '\${this.input[this.position]}'\`);
+        throw new Error(\`Unexpected character at position \${this.position}: '\${this.input[this.position]}'\`);
       }
 
       if (!bestPattern.skip) {
-        const startLoc = this.getLineColumn(this.position);
-        const endLoc = this.getLineColumn(this.position + bestMatch[0].length);
         const matchedToken = {
           type: bestPattern.type,
           value: bestMatch[0],
           start: this.position,
-          end: this.position + bestMatch[0].length,
-          line: startLoc.line,
-          column: startLoc.column,
-          endLine: endLoc.line,
-          endColumn: endLoc.column
+          end: this.position + bestMatch[0].length
         };
         this.tokens.push(matchedToken);
 
@@ -207,11 +168,7 @@ module.exports = {
       type: 'EOF',
       value: '',
       start: this.position,
-      end: this.position,
-      line: this.getLineColumn(this.position).line,
-      column: this.getLineColumn(this.position).column,
-      endLine: this.getLineColumn(this.position).line,
-      endColumn: this.getLineColumn(this.position).column
+      end: this.position
     });
     
     return this.tokens;
@@ -235,17 +192,12 @@ module.exports = {
   consume(expectedType) {
     const token = this.peek();
     if (!token || token.type !== expectedType) {
-      const offset = token ? token.start : (this.tokens.length > 0 ? this.tokens[this.tokens.length - 1].end : 0);
-      const loc = this.lexer.getLineColumn(offset);
       this.errors.push({
         expected: expectedType,
         found: token ? token.type : 'EOF',
-        position: this.position,
-        offset,
-        line: loc.line,
-        column: loc.column
+        position: this.position
       });
-      throw new Error(\`Expected '\${expectedType}', got '\${token ? token.type : 'EOF'}' at line \${loc.line}, column \${loc.column} (offset \${offset})\`);
+      throw new Error(\`Expected '\${expectedType}', got '\${token ? token.type : 'EOF'}'\`);
     }
     if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
       this.eventHandler.terminal(expectedType, token.value, this.position);
@@ -279,10 +231,7 @@ module.exports = {
   getErrorMessage() {
     if (this.errors.length === 0) return 'No errors';
     const err = this.errors[0];
-    const line = Number(err.line) || 1;
-    const column = Number(err.column) || 1;
-    const offset = Number(err.offset) || 0;
-    return \`Syntax error: expected \${err.expected}, got \${err.found} at line \${line}, column \${column} (offset \${offset})\`;
+    return \`Syntax error: expected \${err.expected}, got \${err.found}\`;
   }`,
   
   // Entry parse method
@@ -294,9 +243,7 @@ module.exports = {
       return result;
     }
     if (!next || next.type !== 'EOF') {
-      const offset = next ? next.start : (this.tokens.length > 0 ? this.tokens[this.tokens.length - 1].end : 0);
-      const loc = this.lexer.getLineColumn(offset);
-      throw new Error(\`Unexpected token at end: \${next ? next.type : 'EOF(consumed)'} at line \${loc.line}, column \${loc.column} (offset \${offset})\`);
+      throw new Error(\`Unexpected token at end: \${next ? next.type : 'EOF(consumed)'}\`);
     }
     return result;
   }`,
@@ -413,14 +360,21 @@ module.exports = {
       }
     }
 `,
-  nonterminalBoundaryCheck: `        // Stop at production header boundary: Name ::= ...
-        if (this.peek() && this.peek().type === 'TOKEN__3A__3A__3D_') {
+  nonterminalBoundaryCheck: `        // Stop at statement boundaries so next headers/operators are not absorbed.
+        const next = this.peek();
+        if (next && (
+          next.type === 'TOKEN__3A__3A__3D_' ||
+          next.type === 'TOKEN__3C__3C_' ||
+          next.type === 'TOKEN__3E__3E_' ||
+          next.type === 'TOKEN__5C__5C_' ||
+          next.type === 'TOKEN__3D__3D_'
+        )) {
           this.position = savePos;
           this.restoreEventState(saveMark);
           break;
         }
 `,
-  nonterminalBoundaryGuardNames: ['SyntaxItem', 'LexicalItem'],
+  nonterminalBoundaryGuardNames: ['SyntaxItem', 'LexicalItem', 'NameOrString'],
   nonterminalZeroOrMore: `    while (true) {
       const savePos = this.position;
       const saveMark = this.markEventState();

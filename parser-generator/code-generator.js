@@ -248,7 +248,7 @@ class CodeGenerator {
         // Escape backslashes
         result += '\\\\';
       } else if (char === ']') {
-        // Preserve literal closing bracket inside character classes.
+        // Keep closing bracket literal valid inside generated character classes.
         result += '\\]';
       } else {
         // No escaping needed for other characters when we have \uXXXX escapes
