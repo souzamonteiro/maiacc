@@ -134,6 +134,33 @@ npm run test:integration
   - `parse()`
   - `getErrorMessage()`
 
+### Error Location Reporting With ParseTreeCollector
+
+When using the default `parse-tree-collector.js`, you can wrap parsing with
+`collector.parse(parser, inputLabel)` to get enriched syntax errors with
+`line`, `column`, and `offset`.
+
+Example:
+
+```js
+const Parser = require('./my-parser');
+const { ParseTreeCollector } = require('./parse-tree-collector');
+
+const input = '1 +\n* 2';
+const collector = new ParseTreeCollector();
+const parser = new Parser(input, collector);
+
+try {
+  collector.parse(parser, 'demo-input');
+} catch (error) {
+  console.error(error.message);
+  // Parse failed for demo-input: ... at line X, column Y (offset Z)
+}
+```
+
+If you call `parser.parse()` directly, parsing still works, but the thrown error
+message is not enriched by the collector.
+
 ---
 
 ## Known limitations (current phase)

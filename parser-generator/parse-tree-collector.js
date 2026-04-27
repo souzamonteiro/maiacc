@@ -4,6 +4,31 @@ class ParseTreeCollector {
     this.root = null;
   }
 
+  parse(parser, inputLabel = 'input') {
+    if (!parser || typeof parser.parse !== 'function') {
+      throw new Error('ParseTreeCollector.parse requires a parser instance with parse()');
+    }
+
+    const inputText = parser.lexer && typeof parser.lexer.input === 'string'
+      ? parser.lexer.input
+      : '';
+
+    try {
+      return parser.parse();
+    } catch (err) {
+      const message = err && err.message ? err.message : String(err);
+      const offset = extractOffsetFromError(err, parser);
+      if (offset === null || inputText.length === 0) {
+        throw new Error(`Parse failed for ${inputLabel}: ${message}`);
+      }
+
+      const loc = offsetToLineColumn(inputText, offset);
+      throw new Error(
+        `Parse failed for ${inputLabel}: ${message} at line ${loc.line}, column ${loc.column} (offset ${loc.offset})`
+      );
+    }
+  }
+
   checkpoint() {
     return {
       stack: structuredClone(this.stack),
@@ -61,6 +86,47 @@ class ParseTreeCollector {
       ? `<?xml version="1.0" encoding="UTF-8"?>${xmlBody}`
       : xmlBody;
   }
+}
+
+function offsetToLineColumn(text, offset) {
+  const safeOffset = Math.max(0, Math.min(Number(offset) || 0, text.length));
+  let line = 1;
+  let column = 1;
+
+  for (let i = 0; i < safeOffset; i++) {
+    const ch = text[i];
+    if (ch === '\r') {
+      if (text[i + 1] === '\n') {
+        i++;
+      }
+      line++;
+      column = 1;
+    } else if (ch === '\n') {
+      line++;
+      column = 1;
+    } else {
+      column++;
+    }
+  }
+
+  return { line, column, offset: safeOffset };
+}
+
+function extractOffsetFromError(err, parser) {
+  if (parser && Array.isArray(parser.tokens) && Number.isInteger(parser.position)) {
+    const token = parser.tokens[parser.position] || null;
+    if (token && Number.isInteger(token.start)) {
+      return token.start;
+    }
+  }
+
+  const message = err && err.message ? String(err.message) : '';
+  const match = message.match(/\b(?:position|offset)\s+(\d+)\b/i);
+  if (match) {
+    return Number(match[1]);
+  }
+
+  return null;
 }
 
 function xmlEscape(value) {

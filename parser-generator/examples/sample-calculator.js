@@ -104,7 +104,7 @@ function evaluateParseTree(root) {
 function runCase(expression, expected, epsilon = 1e-12) {
   const collector = new ParseTreeCollector();
   const parser = new Parser(expression, collector);
-  parser.parse();
+  collector.parse(parser, expression);
 
   const actual = evaluateParseTree(collector.root);
   const ok = Math.abs(actual - expected) <= epsilon;
@@ -145,6 +145,16 @@ try {
   console.log(demo.collector.toJSON());
   console.log('🧾 Parse tree (XML):');
   console.log(demo.collector.toXml());
+
+  const invalidExpression = '1 +\n* 2';
+  const invalidCollector = new ParseTreeCollector();
+  const invalidParser = new Parser(invalidExpression, invalidCollector);
+  try {
+    invalidCollector.parse(invalidParser, 'invalid-expression-demo');
+  } catch (error) {
+    console.log('📍 Error location demo:');
+    console.log(error.message);
+  }
 } catch (error) {
   console.log('❌ Error:', error.message);
   process.exit(1);

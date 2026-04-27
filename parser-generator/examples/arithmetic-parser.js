@@ -57,6 +57,12 @@ class Lexer {
       );
 
       for (const pattern of this.tokenPatterns) {
+        // Template middle/tail tokens are context-sensitive and must only
+        // be considered while lexing inside an active template expression.
+        if ((pattern.type === 'TemplateMiddle' || pattern.type === 'TemplateTail') && this.templateDepth === 0) {
+          continue;
+        }
+
         const regex = pattern.regex;
         const match = this.input.substring(this.position).match(regex);
 

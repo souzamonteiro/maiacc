@@ -71,3 +71,7 @@ bash bin/tREx.sh --ebnf --only-xml --to-xml parser-generator/examples/grammar.xm
 ## Related docs
 
 - `parser-generator/README.md`: generator internals, self-host flow, and test commands.
+- Compatibility note: for parser-based programs that use the default collector,
+  prefer `collector.parse(parser, inputLabel)` to get enriched parse errors with
+  line/column/offset. See the section "Error Location Reporting With ParseTreeCollector"
+  in `parser-generator/README.md`.
