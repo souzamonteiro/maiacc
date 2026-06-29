@@ -368,3 +368,19 @@ describe('CodeGenerator.generateLexer – lexical preference ordering', () => {
     assert.equal(parser.tokens[0].value, '3.14');
   });
 });
+
+describe('CodeGenerator.generateLexer – WAT whitespace regression', () => {
+  it('keeps lowercase sourceCharacter/lineTerminator subtraction in single-line comments', async () => {
+    const watXml = fs.readFileSync(path.join(__dirname, '../../examples/WAT.xml'), 'utf8');
+    const grammar = await new GrammarParser(watXml).parse();
+    const code = new CodeGenerator(grammar).generate();
+    const Parser = loadGeneratedParser(code);
+    const parser = new Parser(';; comment\n(module)');
+
+    assert.equal(
+      parser.tokens[0].type,
+      'TOKEN__28_',
+      'WAT single-line comments must stop at the newline and preserve the next real token'
+    );
+  });
+});

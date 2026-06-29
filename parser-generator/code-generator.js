@@ -134,7 +134,7 @@ class CodeGenerator {
         const esc = this.escapeCharClassChar(ch);
         base = `[^${esc}]`;
       } else if (
-        (lft.type === 'anyChar' || (lft.type === 'tokenRef' && lft.value === 'SourceCharacter')) &&
+        (lft.type === 'anyChar' || (lft.type === 'tokenRef' && this.isNamedTokenRef(lft.value, 'sourcecharacter'))) &&
         lft.quantifier === 'exactly1' &&
         rgt.type === 'group'
       ) {
@@ -179,12 +179,16 @@ class CodeGenerator {
           if (item.type === 'literal') {
             const ch = this.decodeSingleLiteralChar(item.value);
             if (ch != null) chars.push(ch);
-          } else if (item.type === 'tokenRef' && item.value === 'LineTerminator') {
+          } else if (item.type === 'tokenRef' && this.isNamedTokenRef(item.value, 'lineterminator')) {
             chars.push('\n', '\r', '\u2028', '\u2029');
           }
         }
       }
       return chars;
+    }
+
+    isNamedTokenRef(value, expected) {
+      return typeof value === 'string' && value.toLowerCase() === expected;
     }
 
     escapeCharClassChar(ch) {
@@ -311,8 +315,12 @@ class CodeGenerator {
 
         // Special-case REx whitespace: avoid over-greedy comment regexes that can
         // swallow the remainder of the file in single-state lexers.
-        if (token.isSkip && name === 'Whitespace') {
-          pattern = '(?:[\\u0009\\u000A\\u000D\\u0020]+|\\/\\/[^\\n]*\\n?|\\/\\*(?!\\s*ws\\s*:)[\\s\\S]*?\\*\\/)+';
+        if (token.isSkip && /^whitespace$/i.test(name)) {
+          if (pattern.includes(';;') || pattern.includes('\\(;')) {
+            pattern = '(?:[\\u0009\\u000A\\u000D\\u0020]+|;;[^\\n\\r\\u2028\\u2029]*(?:\\n|\\r|\\u2028|\\u2029|$)|\\(;[\\s\\S]*?;\\))+';
+          } else {
+            pattern = '(?:[\\u0009\\u000A\\u000D\\u0020]+|\\/\\/[^\\n]*\\n?|\\/\\*(?!\\s*ws\\s*:)[\\s\\S]*?\\*\\/)+';
+          }
         }
 
         if (pattern && !this.regexCanMatchEmpty(pattern)) {
