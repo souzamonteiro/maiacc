@@ -185,8 +185,8 @@ module.exports = {
     this.eventHandler = eventHandler;
   }
   
-  peek() {
-    return this.tokens[this.position];
+  peek(offset = 0) {
+    return this.tokens[this.position + offset];
   }
   
   consume(expectedType) {
@@ -209,6 +209,9 @@ module.exports = {
   match(expectedType) {
     const token = this.peek();
     if (token && token.type === expectedType) {
+      if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
+        this.eventHandler.terminal(expectedType, token.value, this.position);
+      }
       this.position++;
       return true;
     }
@@ -299,9 +302,10 @@ module.exports = {
     }`,
   
   // One-or-more match
-  oneOrMore: `    do {
-      // One or more matched
-    } while (this.match('{{token}}'));`,
+  oneOrMore: `    this.consume('{{token}}');
+    while (this.match('{{token}}')) {
+      // Additional matches
+    }`,
   
   // Call rule
   parseRule: `    this.parse{{rule}}();`,
@@ -331,7 +335,8 @@ module.exports = {
 `,
   terminalZeroOrMore: `    while (this.match('{{token}}')) { /* zero or more matched */ }
 `,
-  terminalOneOrMore: `    do { /* one or more matched */ } while (this.match('{{token}}'));
+  terminalOneOrMore: `    this.consume('{{token}}');
+    while (this.match('{{token}}')) { /* additional terminal matched */ }
 `,
   terminalDefault: `    this.consume('{{token}}');
 `,

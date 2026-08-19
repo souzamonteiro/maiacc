@@ -172,8 +172,8 @@ class Parser {
     this.eventHandler = eventHandler;
   }
   
-  peek() {
-    return this.tokens[this.position];
+  peek(offset = 0) {
+    return this.tokens[this.position + offset];
   }
   
   consume(expectedType) {
@@ -196,6 +196,9 @@ class Parser {
   match(expectedType) {
     const token = this.peek();
     if (token && token.type === expectedType) {
+      if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
+        this.eventHandler.terminal(expectedType, token.value, this.position);
+      }
       this.position++;
       return true;
     }
