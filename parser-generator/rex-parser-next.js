@@ -5,6 +5,7 @@ class Lexer {
     this.tokens = [];
     this.charClassDepth = 0;
     this.templateDepth = 0;
+    this.templateBraceDepthStack = [];
     this.tokenPatterns = [    { type: 'TOKEN__3C__3F_', regex: /^<\?/ },    { type: 'TOKEN__3F__3E_', regex: /^\?>/ },    { type: 'TOKEN__3A__3A__3D_', regex: /^::=/ },    { type: 'TOKEN__7C_', regex: /^\|/ },    { type: 'TOKEN__2F_', regex: /^\// },    { type: 'TOKEN__3F_', regex: /^\?/ },    { type: 'TOKEN__2A_', regex: /^\*/ },    { type: 'TOKEN__2B_', regex: /^\+/ },    { type: 'TOKEN__28_', regex: /^\(/ },    { type: 'TOKEN__29_', regex: /^\)/ },    { type: 'TOKEN__3C__3F_TOKENS_3F__3E_', regex: /^<\?TOKENS\?>/ },    { type: 'TOKEN__2E_', regex: /^\./ },    { type: 'TOKEN__26_', regex: /^&/ },    { type: 'TOKEN__2D_', regex: /^-/ },    { type: 'TOKEN__24_', regex: /^\$/ },    { type: 'TOKEN__5B_', regex: /^\[/ },    { type: 'TOKEN__5B__5E_', regex: /^\[\^/ },    { type: 'TOKEN__5D_', regex: /^\]/ },    { type: 'TOKEN__2F__2A_', regex: /^\/\*/ },    { type: 'TOKEN_ws', regex: /^ws/ },    { type: 'TOKEN__3A_', regex: /^:/ },    { type: 'TOKEN_explicit', regex: /^explicit/ },    { type: 'TOKEN_definition', regex: /^definition/ },    { type: 'TOKEN__2A__2F_', regex: /^\*\// },    { type: 'TOKEN__3E__3E_', regex: /^>>/ },    { type: 'TOKEN__3C__3C_', regex: /^<</ },    { type: 'TOKEN__5C__5C_', regex: /^\\\\/ },    { type: 'TOKEN__3D__3D_', regex: /^==/ },    { type: 'TOKEN__3C__3F_ENCORE_3F__3E_', regex: /^<\?ENCORE\?>/ },    { type: 'Name', regex: /^(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])(?:(?:(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])|-|\.|[0-9]|·|[\u0300-\u036f]|[\u203f-\u2040]))*/ },    { type: 'Space', regex: /^(?:(?:(?:\u0009|\u000d| ))+|\u000a)/ },    { type: 'StringLiteral', regex: /^(?:"(?:[^"\u0009\u000a\u000d])*"|'(?:[^'\u0009\u000a\u000d])*')/ },    { type: 'CaretName', regex: /^\^(?:(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])(?:(?:(?:[A-Z]|_|[a-z]|[\u00c0-\u00d6]|[\u00d8-\u00f6]|[\u00f8-\u02ff]|[\u0370-\u037d]|[\u037f-\u1fff]|[\u200c-\u200d]|[\u2070-\u218f]|[\u2c00-\u2fef]|[\u3001-\ud7ff]|[\uf900-\ufdcf]|[\ufdf0-\ufffd])|-|\.|[0-9]|·|[\u0300-\u036f]|[\u203f-\u2040]))*)?/ },    { type: 'CharCode', regex: /^#x(?:[0-9a-fA-F])+/ },    { type: 'Char', regex: /^(?:[^\u0009\u000a\u000d#\]]|#)/ },    { type: 'CharRange', regex: /^(?:[^\u0009\u000a\u000d#\]]|#)-(?:[^\u0009\u000a\u000d#\]]|#)/ },    { type: 'CharCodeRange', regex: /^#x(?:[0-9a-fA-F])+-#x(?:[0-9a-fA-F])+/ },    { type: 'skip', regex: /^(?:[\u0009\u000A\u000D\u0020]+|\/\/[^\n]*\n?|\/\*(?!\s*ws\s*:)[\s\S]*?\*\/)+/, skip: true },    ];
   }
 
@@ -38,11 +39,34 @@ class Lexer {
 
   enterTemplateSpan() {
     this.templateDepth++;
+    this.templateBraceDepthStack.push(0);
   }
 
   exitTemplateSpan() {
     if (this.templateDepth > 0) {
       this.templateDepth--;
+    }
+    if (this.templateBraceDepthStack.length > 0) {
+      this.templateBraceDepthStack.pop();
+    }
+  }
+
+  currentTemplateBraceDepth() {
+    return this.templateBraceDepthStack.length === 0
+      ? 0
+      : this.templateBraceDepthStack[this.templateBraceDepthStack.length - 1];
+  }
+
+  incrementTemplateBraceDepth() {
+    if (this.templateBraceDepthStack.length > 0) {
+      this.templateBraceDepthStack[this.templateBraceDepthStack.length - 1] += 1;
+    }
+  }
+
+  decrementTemplateBraceDepth() {
+    const index = this.templateBraceDepthStack.length - 1;
+    if (index >= 0 && this.templateBraceDepthStack[index] > 0) {
+      this.templateBraceDepthStack[index] -= 1;
     }
   }
   
@@ -57,9 +81,10 @@ class Lexer {
       );
 
       for (const pattern of this.tokenPatterns) {
-        // Template middle/tail tokens are context-sensitive and must only
-        // be considered while lexing inside an active template expression.
-        if ((pattern.type === 'TemplateMiddle' || pattern.type === 'TemplateTail') && this.templateDepth === 0) {
+        // Template spans are synthesized only when a closing brace ends the
+        // active interpolation. Their raw patterns must not consume ordinary
+        // braces from nested expressions.
+        if (pattern.type === 'TemplateMiddle' || pattern.type === 'TemplateTail') {
           continue;
         }
 
@@ -68,25 +93,42 @@ class Lexer {
 
         if (match && match.index === 0 && match[0].length > 0) {
           let effectivePattern = pattern;
+          let effectiveMatch = match;
           // When parsing template expressions, disambiguate closing brace as template span boundary.
-          if (this.templateDepth > 0 && pattern.type === 'TOKEN__7D_') {
+          if (this.templateDepth > 0
+            && pattern.type === 'TOKEN__7D_'
+            && this.currentTemplateBraceDepth() === 0) {
             if (this.isTemplateSpanPattern(this.position, 'TemplateMiddle')) {
-              effectivePattern = { ...pattern, type: 'TemplateMiddle' };
+              const templateMiddle = this.tokenPatterns.find((candidate) => candidate.type === 'TemplateMiddle');
+              const templateMatch = templateMiddle
+                ? this.input.substring(this.position).match(templateMiddle.regex)
+                : null;
+              if (templateMatch && templateMatch.index === 0 && templateMatch[0].length > 0) {
+                effectivePattern = templateMiddle;
+                effectiveMatch = templateMatch;
+              }
             } else if (this.isTemplateSpanPattern(this.position, 'TemplateTail')) {
-              effectivePattern = { ...pattern, type: 'TemplateTail' };
+              const templateTail = this.tokenPatterns.find((candidate) => candidate.type === 'TemplateTail');
+              const templateMatch = templateTail
+                ? this.input.substring(this.position).match(templateTail.regex)
+                : null;
+              if (templateMatch && templateMatch.index === 0 && templateMatch[0].length > 0) {
+                effectivePattern = templateTail;
+                effectiveMatch = templateMatch;
+              }
             }
           }
 
-          candidates.push({ pattern: effectivePattern, match });
+          candidates.push({ pattern: effectivePattern, match: effectiveMatch });
           if (!bestMatch
-              || match[0].length > bestMatch[0].length
-              || (match[0].length === bestMatch[0].length && effectivePattern.skip && !bestPattern.skip)
-              || (match[0].length === bestMatch[0].length
+              || effectiveMatch[0].length > bestMatch[0].length
+              || (effectiveMatch[0].length === bestMatch[0].length && effectivePattern.skip && !bestPattern.skip)
+              || (effectiveMatch[0].length === bestMatch[0].length
                   && bestPattern
                   && isGenericNameType(bestPattern.type)
                   && !isGenericNameType(effectivePattern.type))) {
             bestPattern = effectivePattern;
-            bestMatch = match;
+            bestMatch = effectiveMatch;
           }
         }
       }
@@ -141,6 +183,10 @@ class Lexer {
           this.charClassDepth++;
         } else if (bestPattern.type === 'TOKEN__5D_' && this.charClassDepth > 0) {
           this.charClassDepth--;
+        } else if (bestPattern.type === 'TOKEN__7B_' && this.templateDepth > 0) {
+          this.incrementTemplateBraceDepth();
+        } else if (bestPattern.type === 'TOKEN__7D_' && this.templateDepth > 0) {
+          this.decrementTemplateBraceDepth();
         } else if (bestPattern.type === 'TemplateHead') {
           this.enterTemplateSpan();
         } else if (bestPattern.type === 'TemplateTail') {
@@ -172,8 +218,8 @@ class Parser {
     this.eventHandler = eventHandler;
   }
   
-  peek() {
-    return this.tokens[this.position];
+  peek(offset = 0) {
+    return this.tokens[this.position + offset];
   }
   
   consume(expectedType) {
@@ -196,10 +242,37 @@ class Parser {
   match(expectedType) {
     const token = this.peek();
     if (token && token.type === expectedType) {
+      if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
+        this.eventHandler.terminal(expectedType, token.value, this.position);
+      }
       this.position++;
       return true;
     }
     return false;
+  }
+
+  consumeContextual(expectedType) {
+    const token = this.peek();
+    if (token && token.type === expectedType) {
+      return this.consume(expectedType);
+    }
+
+    const pattern = this.lexer.tokenPatterns.find((candidate) => candidate.type === expectedType);
+    const match = pattern && token ? token.value.match(pattern.regex) : null;
+    if (!match || match.index !== 0 || match[0].length !== token.value.length) {
+      this.errors.push({
+        expected: expectedType,
+        found: token ? token.type : 'EOF',
+        position: this.position
+      });
+      throw new Error('Expected contextual ' + expectedType + ', got ' + (token ? token.type : 'EOF'));
+    }
+
+    if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
+      this.eventHandler.terminal(token.type, token.value, this.position);
+    }
+    this.position++;
+    return token;
   }
 
   markEventState() {

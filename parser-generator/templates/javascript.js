@@ -8,6 +8,7 @@ module.exports = {
     this.tokens = [];
     this.charClassDepth = 0;
     this.templateDepth = 0;
+    this.templateBraceDepthStack = [];
     this.tokenPatterns = [`,
   
   // Token definition
@@ -50,11 +51,34 @@ module.exports = {
 
   enterTemplateSpan() {
     this.templateDepth++;
+    this.templateBraceDepthStack.push(0);
   }
 
   exitTemplateSpan() {
     if (this.templateDepth > 0) {
       this.templateDepth--;
+    }
+    if (this.templateBraceDepthStack.length > 0) {
+      this.templateBraceDepthStack.pop();
+    }
+  }
+
+  currentTemplateBraceDepth() {
+    return this.templateBraceDepthStack.length === 0
+      ? 0
+      : this.templateBraceDepthStack[this.templateBraceDepthStack.length - 1];
+  }
+
+  incrementTemplateBraceDepth() {
+    if (this.templateBraceDepthStack.length > 0) {
+      this.templateBraceDepthStack[this.templateBraceDepthStack.length - 1] += 1;
+    }
+  }
+
+  decrementTemplateBraceDepth() {
+    const index = this.templateBraceDepthStack.length - 1;
+    if (index >= 0 && this.templateBraceDepthStack[index] > 0) {
+      this.templateBraceDepthStack[index] -= 1;
     }
   }
   
@@ -69,9 +93,10 @@ module.exports = {
       );
 
       for (const pattern of this.tokenPatterns) {
-        // Template middle/tail tokens are context-sensitive and must only
-        // be considered while lexing inside an active template expression.
-        if ((pattern.type === 'TemplateMiddle' || pattern.type === 'TemplateTail') && this.templateDepth === 0) {
+        // Template spans are synthesized only when a closing brace ends the
+        // active interpolation. Their raw patterns must not consume ordinary
+        // braces from nested expressions.
+        if (pattern.type === 'TemplateMiddle' || pattern.type === 'TemplateTail') {
           continue;
         }
 
@@ -80,25 +105,42 @@ module.exports = {
 
         if (match && match.index === 0 && match[0].length > 0) {
           let effectivePattern = pattern;
+          let effectiveMatch = match;
           // When parsing template expressions, disambiguate closing brace as template span boundary.
-          if (this.templateDepth > 0 && pattern.type === 'TOKEN__7D_') {
+          if (this.templateDepth > 0
+            && pattern.type === 'TOKEN__7D_'
+            && this.currentTemplateBraceDepth() === 0) {
             if (this.isTemplateSpanPattern(this.position, 'TemplateMiddle')) {
-              effectivePattern = { ...pattern, type: 'TemplateMiddle' };
+              const templateMiddle = this.tokenPatterns.find((candidate) => candidate.type === 'TemplateMiddle');
+              const templateMatch = templateMiddle
+                ? this.input.substring(this.position).match(templateMiddle.regex)
+                : null;
+              if (templateMatch && templateMatch.index === 0 && templateMatch[0].length > 0) {
+                effectivePattern = templateMiddle;
+                effectiveMatch = templateMatch;
+              }
             } else if (this.isTemplateSpanPattern(this.position, 'TemplateTail')) {
-              effectivePattern = { ...pattern, type: 'TemplateTail' };
+              const templateTail = this.tokenPatterns.find((candidate) => candidate.type === 'TemplateTail');
+              const templateMatch = templateTail
+                ? this.input.substring(this.position).match(templateTail.regex)
+                : null;
+              if (templateMatch && templateMatch.index === 0 && templateMatch[0].length > 0) {
+                effectivePattern = templateTail;
+                effectiveMatch = templateMatch;
+              }
             }
           }
 
-          candidates.push({ pattern: effectivePattern, match });
+          candidates.push({ pattern: effectivePattern, match: effectiveMatch });
           if (!bestMatch
-              || match[0].length > bestMatch[0].length
-              || (match[0].length === bestMatch[0].length && effectivePattern.skip && !bestPattern.skip)
-              || (match[0].length === bestMatch[0].length
+              || effectiveMatch[0].length > bestMatch[0].length
+              || (effectiveMatch[0].length === bestMatch[0].length && effectivePattern.skip && !bestPattern.skip)
+              || (effectiveMatch[0].length === bestMatch[0].length
                   && bestPattern
                   && isGenericNameType(bestPattern.type)
                   && !isGenericNameType(effectivePattern.type))) {
             bestPattern = effectivePattern;
-            bestMatch = match;
+            bestMatch = effectiveMatch;
           }
         }
       }
@@ -153,6 +195,10 @@ module.exports = {
           this.charClassDepth++;
         } else if (bestPattern.type === 'TOKEN__5D_' && this.charClassDepth > 0) {
           this.charClassDepth--;
+        } else if (bestPattern.type === 'TOKEN__7B_' && this.templateDepth > 0) {
+          this.incrementTemplateBraceDepth();
+        } else if (bestPattern.type === 'TOKEN__7D_' && this.templateDepth > 0) {
+          this.decrementTemplateBraceDepth();
         } else if (bestPattern.type === 'TemplateHead') {
           this.enterTemplateSpan();
         } else if (bestPattern.type === 'TemplateTail') {
@@ -216,6 +262,30 @@ module.exports = {
       return true;
     }
     return false;
+  }
+
+  consumeContextual(expectedType) {
+    const token = this.peek();
+    if (token && token.type === expectedType) {
+      return this.consume(expectedType);
+    }
+
+    const pattern = this.lexer.tokenPatterns.find((candidate) => candidate.type === expectedType);
+    const match = pattern && token ? token.value.match(pattern.regex) : null;
+    if (!match || match.index !== 0 || match[0].length !== token.value.length) {
+      this.errors.push({
+        expected: expectedType,
+        found: token ? token.type : 'EOF',
+        position: this.position
+      });
+      throw new Error('Expected contextual ' + expectedType + ', got ' + (token ? token.type : 'EOF'));
+    }
+
+    if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
+      this.eventHandler.terminal(token.type, token.value, this.position);
+    }
+    this.position++;
+    return token;
   }
 
   markEventState() {
@@ -350,6 +420,18 @@ module.exports = {
     while (this.match('{{token}}')) { /* one or more */ }
 `,
   lexicalDefault: `    this.consume('{{token}}');
+`,
+
+  // Contextual lexical references (REx: Name^token). A more specific token
+  // may have won lexing, but its full text still has to satisfy Name's regex.
+  contextualLexicalOptional: `    { const savePos = this.position; const saveMark = this.markEventState(); try { this.consumeContextual('{{token}}'); } catch (e) { this.position = savePos; this.restoreEventState(saveMark); } }
+`,
+  contextualLexicalZeroOrMore: `    while (true) { const savePos = this.position; const saveMark = this.markEventState(); try { this.consumeContextual('{{token}}'); } catch (e) { this.position = savePos; this.restoreEventState(saveMark); break; } }
+`,
+  contextualLexicalOneOrMore: `    this.consumeContextual('{{token}}');
+    while (true) { const savePos = this.position; const saveMark = this.markEventState(); try { this.consumeContextual('{{token}}'); } catch (e) { this.position = savePos; this.restoreEventState(saveMark); break; } }
+`,
+  contextualLexicalDefault: `    this.consumeContextual('{{token}}');
 `,
 
   // Nonterminal item fragments

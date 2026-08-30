@@ -199,10 +199,18 @@ class GrammarParser {
     if (primary.NameOrString) {
       const nos = primary.NameOrString;
       if (nos.Name) {
-        return { type: 'nonterminal', value: nos.Name };
+        return {
+          type: 'nonterminal',
+          value: nos.Name,
+          context: this.parseContext(nos.Context)
+        };
       }
       if (nos.StringLiteral) {
-        return { type: 'terminal', value: this.unescapeString(nos.StringLiteral) };
+        return {
+          type: 'terminal',
+          value: this.unescapeString(nos.StringLiteral),
+          context: this.parseContext(nos.Context)
+        };
       }
     }
     
@@ -225,6 +233,11 @@ class GrammarParser {
     }
     
     return null;
+  }
+
+  parseContext(context) {
+    if (!context || !context.CaretName) return null;
+    return String(context.CaretName).replace(/^\^/, '');
   }
   
   parseLexicalProduction(prod) {

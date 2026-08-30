@@ -384,3 +384,38 @@ describe('CodeGenerator.generateLexer – WAT whitespace regression', () => {
     );
   });
 });
+
+describe('CodeGenerator – contextual lexical references', () => {
+  it('honors Name^token when a literal token wins lexical classification', () => {
+    const rules = new Map();
+    rules.set('Start', {
+      type: 'syntax',
+      name: 'Start',
+      sequences: [[{ type: 'nonterminal', value: 'Name', context: 'token', quantifier: 'exactly1' }]],
+    });
+    // This production supplies the literal token that shadows Name at lexing time.
+    rules.set('Keyword', {
+      type: 'syntax',
+      name: 'Keyword',
+      sequences: [[{ type: 'terminal', value: 'get', quantifier: 'exactly1' }]],
+    });
+
+    const tokens = new Map();
+    tokens.set('Name', {
+      type: 'lexical',
+      name: 'Name',
+      patterns: [[{ type: 'charclass', value: 'a-z', negated: false, quantifier: 'oneOrMore' }]],
+      isSkip: false,
+    });
+
+    const Parser = loadGeneratedParser(new CodeGenerator({
+      rules,
+      tokens,
+      startSymbol: 'Start',
+    }).generate());
+
+    const parser = new Parser('get');
+    assert.equal(parser.tokens[0].type, 'TOKEN_get');
+    assert.doesNotThrow(() => parser.parse());
+  });
+});

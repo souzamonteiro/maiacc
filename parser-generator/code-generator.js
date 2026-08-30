@@ -517,15 +517,30 @@ class CodeGenerator {
   generateNonterminal(item) {
     // If the name is a lexical token, consume it instead of calling a parse rule
     if (this.grammar.tokens.has(item.value)) {
+      const contextual = String(item.context || '').toLowerCase() === 'token';
+      const fragments = contextual
+        ? {
+            optional: templates.contextualLexicalOptional,
+            zeroOrMore: templates.contextualLexicalZeroOrMore,
+            oneOrMore: templates.contextualLexicalOneOrMore,
+            exactly1: templates.contextualLexicalDefault
+          }
+        : {
+            optional: templates.lexicalOptional,
+            zeroOrMore: templates.lexicalZeroOrMore,
+            oneOrMore: templates.lexicalOneOrMore,
+            exactly1: templates.lexicalDefault
+          };
+
       switch (item.quantifier) {
         case 'optional':
-          return this.renderTemplate(templates.lexicalOptional, { token: item.value });
+          return this.renderTemplate(fragments.optional, { token: item.value });
         case 'zeroOrMore':
-          return this.renderTemplate(templates.lexicalZeroOrMore, { token: item.value });
+          return this.renderTemplate(fragments.zeroOrMore, { token: item.value });
         case 'oneOrMore':
-          return this.renderTemplate(templates.lexicalOneOrMore, { token: item.value });
+          return this.renderTemplate(fragments.oneOrMore, { token: item.value });
         default:
-          return this.renderTemplate(templates.lexicalDefault, { token: item.value });
+          return this.renderTemplate(fragments.exactly1, { token: item.value });
       }
     }
 
