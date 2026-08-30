@@ -229,6 +229,7 @@ module.exports = {
     this.position = 0;
     this.errors = [];
     this.eventHandler = eventHandler;
+    this.failureMemo = new Set();
   }
   
   peek(offset = 0) {
@@ -324,6 +325,11 @@ module.exports = {
   // Rule function template
   ruleFunction: `
   parse{{ruleName}}() {
+    const __memoStart = this.position;
+    const __memoKey = '{{ruleName}}@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule {{ruleName}} at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('{{ruleName}}', this.position);
     }
@@ -332,6 +338,9 @@ module.exports = {
 {{ruleBody}}
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('{{ruleName}}', this.position);
