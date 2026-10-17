@@ -103,7 +103,7 @@ public:
   MaiaCCGeneratedParser(
       const MaiaCCParserToken* tokens,
       unsigned int tokenCount,
-      const MaiaCCParseEvents* events = 0)
+      const MaiaCCParseEvents* events)
       : tokens_(tokens), tokenCount_(tokenCount), position_(0), events_(events) {}
 
   unsigned int position() const { return position_; }
