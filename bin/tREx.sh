@@ -1,6 +1,6 @@
 #!/bin/bash
 # tREx (Template Based REx Compatible Parser Generator) - Parser Generator Script
-# This script converts EBNF grammar to XML (if needed) and generates a JavaScript parser using the REx tool and the parser generator.
+# This script converts EBNF grammar to XML (if needed) and generates parser source using REx and the parser generator.
 
 show_usage() {
     echo "Usage: $0 [options] <grammar-file> [output-parser-file]"
@@ -10,6 +10,7 @@ show_usage() {
     echo "  --xml                  Treat <grammar-file> as XML grammar (default)"
     echo "  --to-xml <xml-file>    XML output path when using --ebnf"
     echo "  --only-xml             Convert EBNF to XML only, do not generate parser"
+    echo "  --language <name>      Parser output language: javascript (default) or cpp98"
     echo "  -h, --help             Show this help message"
 }
 
@@ -35,6 +36,7 @@ INPUT_FORMAT="xml"
 FORMAT_EXPLICIT="false"
 ONLY_XML="false"
 XML_OUTPUT_FILE=""
+LANGUAGE="javascript"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -51,6 +53,19 @@ while [ "$#" -gt 0 ]; do
         --only-xml)
             ONLY_XML="true"
             shift
+            ;;
+        --language)
+            if [ -z "${2:-}" ]; then
+                echo "Missing value for --language."
+                show_usage
+                exit 1
+            fi
+            LANGUAGE="$2"
+            if [ "$LANGUAGE" != "javascript" ] && [ "$LANGUAGE" != "cpp98" ]; then
+                echo "Unsupported parser output language: '$LANGUAGE'."
+                exit 1
+            fi
+            shift 2
             ;;
         --to-xml)
             if [ -z "$2" ]; then
@@ -86,7 +101,13 @@ if [ "$#" -lt 1 ]; then
 fi
 
 GRAMMAR_FILE="$1"
-OUTPUT_FILE="${2:-parser.js}"
+if [ -n "${2:-}" ]; then
+    OUTPUT_FILE="$2"
+elif [ "$LANGUAGE" = "cpp98" ]; then
+    OUTPUT_FILE="parser.cpp"
+else
+    OUTPUT_FILE="parser.js"
+fi
 
 # If format is not explicitly provided, infer from grammar file extension.
 if [ "$FORMAT_EXPLICIT" = "false" ]; then
@@ -142,4 +163,4 @@ else
 fi
 
 echo "Generating parser: '$GRAMMAR_XML_FILE' -> '$OUTPUT_FILE'"
-node "$PARSER_GENERATOR_JS" "$GRAMMAR_XML_FILE" "$OUTPUT_FILE"
+node "$PARSER_GENERATOR_JS" --language "$LANGUAGE" "$GRAMMAR_XML_FILE" "$OUTPUT_FILE"

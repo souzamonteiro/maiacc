@@ -6,6 +6,8 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs   = require('fs');
 const path = require('path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 
 const CodeGenerator = require('../../code-generator');
@@ -292,6 +294,142 @@ describe('CodeGenerator.generate – full arithmetic grammar pipeline', () => {
     const code = (await arithmeticGen()).generate();
     // "}\n}" is fine; "}}" on the same character sequence is the regression
     assert.ok(!code.includes('}}'), 'Generated code must not contain "}}" (merged braces)');
+  });
+});
+
+function findCppCompiler() {
+  const candidates = [process.env.CXX, 'c++', 'clang++', 'g++'].filter(Boolean);
+  for (const candidate of candidates) {
+    const result = spawnSync(candidate, ['--version'], { encoding: 'utf8' });
+    if (!result.error && result.status === 0) return candidate;
+  }
+  return null;
+}
+
+describe('CodeGenerator.generate – C++98 token-stream backend', () => {
+  it('keeps JavaScript as the byte-identical default backend', async () => {
+    const { grammar } = await arithmeticGen();
+    const defaultCode = new CodeGenerator(grammar).generate();
+    const explicitCode = new CodeGenerator(grammar, { language: 'javascript' }).generate();
+    assert.equal(defaultCode, explicitCode);
+  });
+
+  it('emits a C++98 parser that compiles and parses supplied tokens', {
+    skip: !findCppCompiler(),
+  }, async () => {
+    const jsGenerator = await arithmeticGen();
+    const generator = new CodeGenerator(jsGenerator.grammar, { language: 'cpp98' });
+    const parserCode = generator.generate();
+    const compiler = findCppCompiler();
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'maiacc-cpp98-parser-'));
+    const parserPath = path.join(tempRoot, 'generated-parser.cpp');
+    const driverPath = path.join(tempRoot, 'driver.cpp');
+    const executablePath = path.join(tempRoot, 'parser-test');
+
+    try {
+      assert.match(parserCode, /enum MaiaCCParserTokenType/);
+      assert.match(parserCode, /struct MaiaCCParserToken/);
+      assert.match(parserCode, /class MaiaCCGeneratedParser/);
+      assert.doesNotMatch(parserCode, /class Lexer|module\.exports/);
+      fs.writeFileSync(parserPath, parserCode);
+      fs.writeFileSync(driverPath, `#include "generated-parser.cpp"
+
+struct CollectorState {
+  unsigned int starts;
+  unsigned int ends;
+  unsigned int aborts;
+  unsigned int terminals;
+  unsigned int restores;
+};
+
+static unsigned int checkpoint(void* context) {
+  CollectorState* state = static_cast<CollectorState*>(context);
+  return state->terminals;
+}
+
+static void restore(void* context, unsigned int mark) {
+  CollectorState* state = static_cast<CollectorState*>(context);
+  state->terminals = mark;
+  ++state->restores;
+}
+
+static void startNonterminal(void* context, const char*, unsigned int) {
+  ++static_cast<CollectorState*>(context)->starts;
+}
+
+static void terminal(void* context, unsigned int, const char*, unsigned int, unsigned int) {
+  ++static_cast<CollectorState*>(context)->terminals;
+}
+
+static void endNonterminal(void* context, const char*, unsigned int) {
+  ++static_cast<CollectorState*>(context)->ends;
+}
+
+static void abortNonterminal(void* context, const char*, unsigned int) {
+  ++static_cast<CollectorState*>(context)->aborts;
+}
+
+static int matchesContextual(void*, unsigned int, const MaiaCCParserToken*) {
+  return 0;
+}
+
+int main() {
+  const MaiaCCParserToken valid[] = {
+    { ${generator.mapTokenName('Number')}, "42", 2, 0, 2 }
+  };
+  CollectorState validState = { 0, 0, 0, 0, 0 };
+  MaiaCCParseEvents validEvents = {
+    &validState, checkpoint, restore, startNonterminal, terminal,
+    endNonterminal, abortNonterminal, matchesContextual
+  };
+  MaiaCCGeneratedParser validParser(valid, 1, &validEvents);
+  if (!validParser.parse()) return 1;
+  if (validState.starts == 0 || validState.starts != validState.ends) return 2;
+  if (validState.aborts != 0 || validState.terminals != 1) return 3;
+
+  const MaiaCCParserToken invalid[] = {
+    { ${generator.getTokenName('+')}, "+", 1, 0, 1 }
+  };
+  CollectorState invalidState = { 0, 0, 0, 0, 0 };
+  MaiaCCParseEvents invalidEvents = {
+    &invalidState, checkpoint, restore, startNonterminal, terminal,
+    endNonterminal, abortNonterminal, matchesContextual
+  };
+  MaiaCCGeneratedParser invalidParser(invalid, 1, &invalidEvents);
+  if (invalidParser.parse()) return 4;
+  if (invalidState.starts != invalidState.ends + invalidState.aborts) return 5;
+  if (invalidState.aborts == 0) return 6;
+  return 0;
+}
+`);
+
+      const compile = spawnSync(
+        compiler,
+        ['-std=c++98', driverPath, '-o', executablePath],
+        { encoding: 'utf8' },
+      );
+      assert.equal(
+        compile.status,
+        0,
+        `C++98 compile failed:\n${compile.stdout || ''}${compile.stderr || ''}`,
+      );
+      const execute = spawnSync(executablePath, [], { encoding: 'utf8' });
+      assert.equal(
+        execute.status,
+        0,
+        `Generated C++ parser failed:\n${execute.stdout || ''}${execute.stderr || ''}`,
+      );
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects unsupported output languages', async () => {
+    const generator = await arithmeticGen();
+    assert.throws(
+      () => new CodeGenerator(generator.grammar, { language: 'rust' }),
+      /Unsupported parser output language/,
+    );
   });
 });
 

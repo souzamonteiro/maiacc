@@ -1,7 +1,7 @@
 {
   "name": "ebnf-parser-generator",
   "version": "1.0.0",
-  "description": "Generate JavaScript parsers from EBNF grammars",
+  "description": "Generate JavaScript lexer/parsers and C++98 parsers from EBNF grammars",
   "main": "parser-generator.js",
   "scripts": {
     "generate": "node parser-generator.js",
@@ -9,9 +9,9 @@
     "build:safe": "bash build.sh --no-promote",
     "build:selfhost": "bash build.sh",
     "rex": "node ../tools/REx-main.js",
-    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js",
+    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js",
     "test:unit": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js",
-    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js",
+    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js",
     "selfhost:test": "node selfhost-validate.js"
   },
   "dependencies": {

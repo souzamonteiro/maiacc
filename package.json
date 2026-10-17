@@ -1,7 +1,7 @@
 {
   "name": "maiacc",
   "version": "1.3.0",
-  "description": "MaiaCC (tREx): EBNF/XML to JavaScript lexer/parser generator.",
+  "description": "MaiaCC (tREx): EBNF/XML to JavaScript and C++98 parser generator.",
   "author": "The MaiaScript Team (https://www.maiascript.com)",
   "license": "Apache-2.0",
   "main": "parser-generator/parser-generator.js",
@@ -15,6 +15,7 @@
     "parser-generator/parser-generator.js",
     "parser-generator/grammar-parser.js",
     "parser-generator/code-generator.js",
+    "parser-generator/templates/cpp98.js",
     "parser-generator/parse-tree-collector.js",
     "parser-generator/REx.js",
     "parser-generator/rex-parser.js",

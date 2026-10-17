@@ -1,10 +1,40 @@
-// code-generator.js - Generates JavaScript code from a parsed grammar
-const templates = require('./templates/javascript');
+// code-generator.js - Generates parser source from a parsed grammar
+const javascriptTemplates = require('./templates/javascript');
+const cpp98Templates = require('./templates/cpp98');
 
 class CodeGenerator {
-  constructor(grammar) {
+  constructor(grammar, options = {}) {
+    const language = options.language || 'javascript';
+    const templateByLanguage = {
+      javascript: javascriptTemplates,
+      cpp98: cpp98Templates
+    };
+    if (!templateByLanguage[language]) {
+      throw new Error(`Unsupported parser output language: ${language}`);
+    }
+
     this.grammar = grammar;
+    this.language = language;
+    this.templates = templateByLanguage[language];
     this.tokenMap = this.buildTokenMap();
+  }
+
+  mapTokenName(name) {
+    return typeof this.templates.mapTokenName === 'function'
+      ? this.templates.mapTokenName(name)
+      : name;
+  }
+
+  mapRuleName(name) {
+    return typeof this.templates.mapRuleName === 'function'
+      ? this.templates.mapRuleName(name)
+      : name;
+  }
+
+  stringLiteral(value) {
+    return typeof this.templates.cppStringLiteral === 'function'
+      ? this.templates.cppStringLiteral(value)
+      : value;
   }
 
   renderTemplate(template, values = {}) {
@@ -16,8 +46,12 @@ class CodeGenerator {
   }
 
   getBoundaryCheck(name) {
+    const templates = this.templates;
     const guarded = new Set(templates.nonterminalBoundaryGuardNames || []);
     if (!guarded.has(name)) return '';
+    if (typeof templates.generateBoundaryCheck === 'function') {
+      return templates.generateBoundaryCheck(this, name);
+    }
     return templates.nonterminalBoundaryCheck || '';
   }
   
@@ -289,6 +323,11 @@ class CodeGenerator {
   }
   
   generateLexer() {
+    const templates = this.templates;
+    if (typeof templates.generateLexer === 'function') {
+      return templates.generateLexer(this);
+    }
+
     let code = templates.lexerHeader;
     const emitted = new Set();
     const referencedLexicalTokens = this.collectReferencedLexicalTokens();
@@ -420,11 +459,12 @@ class CodeGenerator {
   }
   
   generateParser() {
+    const templates = this.templates;
     let code = templates.parserHeader;
     
     // Add the entry parse method
     code += templates.startRule
-      .replace(/{{startRule}}/g, this.grammar.startSymbol);
+      .replace(/{{startRule}}/g, this.mapRuleName(this.grammar.startSymbol));
     
     // Generate one function per rule
     for (const [name, rule] of this.grammar.rules) {
@@ -436,14 +476,18 @@ class CodeGenerator {
   }
   
   generateRuleFunction(rule) {
+    const templates = this.templates;
     const body = this.generateRuleBody(rule);
     
-    return templates.ruleFunction
-      .replace(/{{ruleName}}/g, rule.name)
-      .replace(/{{ruleBody}}/g, body);
+    return this.renderTemplate(templates.ruleFunction, {
+      ruleName: this.mapRuleName(rule.name),
+      ruleLabel: this.stringLiteral(rule.name),
+      ruleBody: body
+    });
   }
   
   generateRuleBody(rule) {
+    const templates = this.templates;
     if (rule.sequences.length === 0) {
       return templates.emptyRule;
     }
@@ -500,6 +544,7 @@ class CodeGenerator {
   }
   
   generateTerminal(item) {
+    const templates = this.templates;
     const tokenName = this.getTokenName(item.value);
     
     switch (item.quantifier) {
@@ -515,6 +560,7 @@ class CodeGenerator {
   }
   
   generateNonterminal(item) {
+    const templates = this.templates;
     // If the name is a lexical token, consume it instead of calling a parse rule
     if (this.grammar.tokens.has(item.value)) {
       const contextual = String(item.context || '').toLowerCase() === 'token';
@@ -534,24 +580,24 @@ class CodeGenerator {
 
       switch (item.quantifier) {
         case 'optional':
-          return this.renderTemplate(fragments.optional, { token: item.value });
+          return this.renderTemplate(fragments.optional, { token: this.mapTokenName(item.value) });
         case 'zeroOrMore':
-          return this.renderTemplate(fragments.zeroOrMore, { token: item.value });
+          return this.renderTemplate(fragments.zeroOrMore, { token: this.mapTokenName(item.value) });
         case 'oneOrMore':
-          return this.renderTemplate(fragments.oneOrMore, { token: item.value });
+          return this.renderTemplate(fragments.oneOrMore, { token: this.mapTokenName(item.value) });
         default:
-          return this.renderTemplate(fragments.exactly1, { token: item.value });
+          return this.renderTemplate(fragments.exactly1, { token: this.mapTokenName(item.value) });
       }
     }
 
     switch (item.quantifier) {
       case 'optional':
-        return this.renderTemplate(templates.nonterminalOptional, { name: item.value });
+          return this.renderTemplate(templates.nonterminalOptional, { name: this.mapRuleName(item.value) });
       case 'zeroOrMore':
         {
           const boundaryCheck = this.getBoundaryCheck(item.value);
         return this.renderTemplate(templates.nonterminalZeroOrMore, {
-          name: item.value,
+          name: this.mapRuleName(item.value),
           boundaryCheck
         });
         }
@@ -559,16 +605,17 @@ class CodeGenerator {
         {
           const boundaryCheck = this.getBoundaryCheck(item.value);
         return this.renderTemplate(templates.nonterminalOneOrMore, {
-          name: item.value,
+          name: this.mapRuleName(item.value),
           boundaryCheck
         });
         }
       default:
-        return this.renderTemplate(templates.nonterminalDefault, { name: item.value });
+        return this.renderTemplate(templates.nonterminalDefault, { name: this.mapRuleName(item.value) });
     }
   }
   
   generateGroup(item) {
+    const templates = this.templates;
     // Body that tries to match the group once and throws on failure.
     let attempt = '';
     if (item.sequences.length === 1) {
@@ -599,11 +646,11 @@ class CodeGenerator {
     // Look up the mapped token name
     for (const [tokenValue, token] of this.tokenMap) {
       if (tokenValue === value) {
-        return token.name;
+        return this.mapTokenName(token.name);
       }
     }
     // If not found, create a name based on the literal value
-    return `TOKEN_${this.sanitizeName(value)}`;
+    return this.mapTokenName(`TOKEN_${this.sanitizeName(value)}`);
   }
 }
 

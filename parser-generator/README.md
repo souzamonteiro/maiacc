@@ -1,12 +1,13 @@
-# MaiaCC Parser Generator (JavaScript)
+# MaiaCC Parser Generator
 
-A JavaScript parser generator that reads XML produced from EBNF grammars and emits a working JavaScript lexer/parser.
+A parser generator that reads XML produced from EBNF grammars and emits a JavaScript lexer/parser or a C++98 parser over a caller-provided token stream. JavaScript remains the default backend.
 
-This project is being evolved to replace REx usage in this repository workflow and to support scalable multi-language generation in the future.
+The additive C++98 backend reuses the grammar model and production traversal; it intentionally leaves tokenization to the application so context-sensitive scanners can be supplied.
 
 ## Current status
 
-- Generates JS parsers from EBNF-derived XML.
+- Generates JavaScript lexer/parsers from EBNF-derived XML.
+- Generates C++98 parser classes and token enums from the same grammar model.
 - Handles syntax and lexical rules (including groups and quantifiers).
 - Supports skip tokens (for example, whitespace via `/* ws: definition */`).
 - Includes unit and integration tests.
@@ -21,8 +22,9 @@ This project is being evolved to replace REx usage in this repository workflow a
 
 - `parser-generator.js`: CLI entry point for generation.
 - `grammar-parser.js`: Parses grammar XML into internal structures.
-- `code-generator.js`: Generates lexer/parser JavaScript code.
-- `templates/javascript.js`: Output templates for generated parser code.
+- `code-generator.js`: Selects a target backend and walks the parsed grammar.
+- `templates/javascript.js`: JavaScript lexer/parser templates.
+- `templates/cpp98.js`: C++98 parser/token-stream templates.
 - `sample-grammar.ebnf`: Example grammar.
 - `build.sh`: Example generation pipeline.
 - `tests/unit`: Unit tests for parser and generator internals.
@@ -65,6 +67,9 @@ bash bin/tREx.sh --ebnf parser-generator/examples/sample-grammar.ebnf parser-gen
 
 # EBNF -> XML only
 bash bin/tREx.sh --ebnf --only-xml --to-xml parser-generator/examples/grammar.xml parser-generator/examples/sample-grammar.ebnf
+
+# EBNF -> XML -> C++98 parser (scanner is supplied by the application)
+bash bin/tREx.sh --ebnf --language cpp98 parser-generator/examples/sample-grammar.ebnf parser.cpp
 ```
 
 ### Direct usage inside parser-generator
@@ -82,6 +87,9 @@ node parser-generator.js grammar.xml my-parser.js
 ```bash
 node REx.js examples/sample-grammar.ebnf > grammar.xml
 node parser-generator.js grammar.xml arithmetic-parser.js
+
+# Generate a C++98 parser from the same XML grammar
+node parser-generator.js --language cpp98 grammar.xml arithmetic-parser.cpp
 ```
 
 ### 3) Self-hosting validation flow (REx grammar)
@@ -161,16 +169,33 @@ try {
 If you call `parser.parse()` directly, parsing still works, but the thrown error
 message is not enriched by the collector.
 
+The C++98 backend emits `MaiaCCGeneratedParser`, `MaiaCCParserTokenType`,
+`MaiaCCParserToken`, and `MaiaCCParseEvents`. Its input is a completed token
+array; it does not include or generate a scanner. The event interface supports
+nonterminal/terminal callbacks plus checkpoint/rollback so an application can
+build an AST or parse tree. `parse()` returns `bool`, with `position()` and
+`tokenCount()` exposing progress. The generated source uses C++98 and requires
+exceptions enabled for backtracking (`throw int` / `catch (int)`).
+
+The full test command includes a C++98 self-host integration test: MaiaCC's
+JavaScript REx parser tokenizes `REx.ebnf`, then the generated C++ parser must
+accept that token stream and reject an empty one. The test compiles with an
+available native C++ compiler; it skips explicitly when none is installed.
+This validates MaiaCC's generated source, not the downstream MaiaCpp pipeline,
+which must consume MaiaCC through its synchronized in-repository submodule.
+
 ---
 
 ## Known limitations (current phase)
 
 - Grammar contexts/lookaheads are still simplified vs full REx semantics.
 - Some context-sensitive lexical behaviors may require additional stateful lexer modes.
-- This generator currently targets JavaScript output only.
+- The C++98 backend has no lexer, formatted diagnostics, or automatic AST.
+- MaiaCpp pipeline compatibility is a downstream integration check; the
+  generator's C++ output is currently verified with a native C++98 compiler.
 
 ---
 
 ## Goal
 
-Converge from REx-dependent generation to a fully native and extensible JS-based generator, then expand to additional output languages.
+Converge from REx-dependent generation to a native, extensible multi-backend generator while keeping the JavaScript backend stable.

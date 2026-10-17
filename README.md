@@ -2,7 +2,7 @@
 
 ![tREx](images/TyrannosaurusRex.png)
 
-A JavaScript parser generator that reads XML produced from EBNF grammars and emits a working JavaScript lexer/parser.
+A parser generator that reads XML produced from EBNF grammars and emits a JavaScript lexer/parser or a C++98 parser over caller-provided tokens. JavaScript remains the default backend.
 
 ## Process Documentation
 
