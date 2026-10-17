@@ -65,12 +65,10 @@ module.exports = {
   lexerHeader: `#ifndef MAIACC_GENERATED_CPP98_PARSER_H
 #define MAIACC_GENERATED_CPP98_PARSER_H
 
-enum MaiaCCParserTokenType {
 `,
-  token: `    {{tokenName}} = {{id}},
+  token: `#define {{tokenName}} {{id}}
 `,
-  lexerFooter: `    MAIACC_TOKEN_COUNT = {{tokenCount}}
-};
+  lexerFooter: `#define MAIACC_TOKEN_COUNT {{tokenCount}}
 
 static const char* maiaCCParserTokenName(unsigned int type) {
   switch (type) {

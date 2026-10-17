@@ -327,7 +327,8 @@ describe('CodeGenerator.generate – C++98 token-stream backend', () => {
     const executablePath = path.join(tempRoot, 'parser-test');
 
     try {
-      assert.match(parserCode, /enum MaiaCCParserTokenType/);
+      assert.match(parserCode, /#define MAIACC_TOKEN_COUNT/);
+      assert.match(parserCode, /#define MAIACC_TOKEN_Number/);
       assert.match(parserCode, /struct MaiaCCParserToken/);
       assert.match(parserCode, /class MaiaCCGeneratedParser/);
       assert.doesNotMatch(parserCode, /class Lexer|module\.exports/);

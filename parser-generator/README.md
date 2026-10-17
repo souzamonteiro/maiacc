@@ -7,7 +7,7 @@ The additive C++98 backend reuses the grammar model and production traversal; it
 ## Current status
 
 - Generates JavaScript lexer/parsers from EBNF-derived XML.
-- Generates C++98 parser classes and token enums from the same grammar model.
+- Generates C++98 parser classes and prefixed token-ID macros from the same grammar model.
 - Handles syntax and lexical rules (including groups and quantifiers).
 - Supports skip tokens (for example, whitespace via `/* ws: definition */`).
 - Includes unit and integration tests.
@@ -169,8 +169,8 @@ try {
 If you call `parser.parse()` directly, parsing still works, but the thrown error
 message is not enriched by the collector.
 
-The C++98 backend emits `MaiaCCGeneratedParser`, `MaiaCCParserTokenType`,
-`MaiaCCParserToken`, and `MaiaCCParseEvents`. Its input is a completed token
+The C++98 backend emits `MaiaCCGeneratedParser`, prefixed `MAIACC_TOKEN_*`
+macros, `MaiaCCParserToken`, and `MaiaCCParseEvents`. Its input is a completed token
 array; it does not include or generate a scanner. The event interface supports
 nonterminal/terminal callbacks plus checkpoint/rollback so an application can
 build an AST or parse tree. `parse()` returns `bool`, with `position()` and
