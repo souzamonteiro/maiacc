@@ -54,7 +54,7 @@ function generateLexer(generator) {
       .map((token) => `    case ${mapTokenName(token.name)}: return ${cppStringLiteral(token.name)};`)
       .join('\n'),
     rulePrototypes: [...generator.grammar.rules.keys()]
-      .map((name) => `static bool ${mapRuleName(name)}(MaiaCCParserState* self);`)
+      .map((name) => `static int ${mapRuleName(name)}(MaiaCCParserState* self);`)
       .join('\n'),
   });
   return code;
@@ -167,24 +167,24 @@ static void maiaCC_emitTerminal(
   }
 }
 
-static bool maiaCC_matchToken(MaiaCCParserState* self, unsigned int expected) {
+static int maiaCC_matchToken(MaiaCCParserState* self, unsigned int expected) {
   const MaiaCCParserToken* token = maiaCC_peek(self);
-  if (!token || token->type != expected) return false;
+  if (!token || token->type != expected) return 0;
   maiaCC_emitTerminal(self, token);
   ++self->position;
-  return true;
+  return 1;
 }
 
-static bool maiaCC_matchContextualToken(MaiaCCParserState* self, unsigned int expected) {
+static int maiaCC_matchContextualToken(MaiaCCParserState* self, unsigned int expected) {
   const MaiaCCParserToken* token = maiaCC_peek(self);
-  if (!token) return false;
-  const bool accepted = token->type == expected
+  if (!token) return 0;
+  const int accepted = token->type == expected
       || (self->events && self->events->matchesContextual
           && self->events->matchesContextual(self->events->context, expected, token));
-  if (!accepted) return false;
+  if (!accepted) return 0;
   maiaCC_emitTerminal(self, token);
   ++self->position;
-  return true;
+  return 1;
 }
 
 static void maiaCC_expectToken(MaiaCCParserState* self, unsigned int expected) {
@@ -199,7 +199,7 @@ static void maiaCC_expectContextualToken(MaiaCCParserState* self, unsigned int e
 `,
 
   parserHeader: '',
-  startRule: `static bool maiaCC_parse(MaiaCCParserState* self) {
+  startRule: `static int maiaCC_parse(MaiaCCParserState* self) {
   self->position = 0;
   return {{startRule}}(self) && self->position == self->tokenCount;
 }
@@ -209,29 +209,29 @@ static void maiaCC_expectContextualToken(MaiaCCParserState* self, unsigned int e
 `,
 
   ruleFunction: `
-static bool {{ruleName}}(MaiaCCParserState* self) {
+static int {{ruleName}}(MaiaCCParserState* self) {
   const unsigned int __ruleStart = self->position;
   maiaCC_startNonterminal(self, {{ruleLabel}});
   try {
 {{ruleBody}}    maiaCC_endNonterminal(self, {{ruleLabel}});
-    return true;
+    return 1;
   } catch (int) {
     self->position = __ruleStart;
     maiaCC_abortNonterminal(self, {{ruleLabel}});
-    return false;
+    return 0;
   }
 }
 `,
 
   emptyRule: `    /* empty production */
 `,
-  alternativesHeader: `    bool _matched = false;
+  alternativesHeader: `    int _matched = 0;
 `,
   alternativeTryBlock: `    if (!_matched) {
       const unsigned int _alternativeStart = self->position;
       const unsigned int _eventMark = maiaCC_checkpointEvents(self);
       try {
-{{sequence}}        _matched = true;
+{{sequence}}        _matched = 1;
       } catch (int) {
         self->position = _alternativeStart;
         maiaCC_restoreEvents(self, _eventMark);
@@ -279,7 +279,7 @@ static bool {{ruleName}}(MaiaCCParserState* self) {
       }
     }
 `,
-  nonterminalZeroOrMore: `    while (true) {
+  nonterminalZeroOrMore: `    while (1) {
       const unsigned int _iterationStart = self->position;
       const unsigned int _eventMark = maiaCC_checkpointEvents(self);
       if (!{{name}}(self)) {
@@ -292,7 +292,7 @@ static bool {{ruleName}}(MaiaCCParserState* self) {
 `,
   nonterminalOneOrMore: `    {
       unsigned int _count = 0;
-      while (true) {
+      while (1) {
         const unsigned int _iterationStart = self->position;
         const unsigned int _eventMark = maiaCC_checkpointEvents(self);
         if (!{{name}}(self)) {
@@ -309,13 +309,13 @@ static bool {{ruleName}}(MaiaCCParserState* self) {
   nonterminalDefault: `    if (!{{name}}(self)) throw 1;
 `,
 
-  groupAlternativesHeader: `      bool _matchedAlternative = false;
+  groupAlternativesHeader: `      int _matchedAlternative = 0;
 `,
   groupAlternativeTryBlock: `      if (!_matchedAlternative) {
         const unsigned int _alternativeStart = self->position;
         const unsigned int _eventMark = maiaCC_checkpointEvents(self);
         try {
-{{sequence}}          _matchedAlternative = true;
+{{sequence}}          _matchedAlternative = 1;
         } catch (int) {
           self->position = _alternativeStart;
           maiaCC_restoreEvents(self, _eventMark);
@@ -324,7 +324,7 @@ static bool {{ruleName}}(MaiaCCParserState* self) {
 `,
   groupAlternativesFailure: `      if (!_matchedAlternative) throw 1;
 `,
-  groupZeroOrMore: `    while (true) {
+  groupZeroOrMore: `    while (1) {
       const unsigned int _iterationStart = self->position;
       const unsigned int _eventMark = maiaCC_checkpointEvents(self);
       try {
@@ -338,7 +338,7 @@ static bool {{ruleName}}(MaiaCCParserState* self) {
 `,
   groupOneOrMore: `    {
       unsigned int _count = 0;
-      while (true) {
+      while (1) {
         const unsigned int _iterationStart = self->position;
         const unsigned int _eventMark = maiaCC_checkpointEvents(self);
         try {
