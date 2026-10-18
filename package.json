@@ -1,6 +1,6 @@
 {
   "name": "maiacc",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "MaiaCC (tREx): EBNF/XML to JavaScript and C++98 parser generator.",
   "author": "The MaiaScript Team (https://www.maiascript.com)",
   "license": "Apache-2.0",
