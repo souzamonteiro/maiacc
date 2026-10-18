@@ -330,8 +330,10 @@ describe('CodeGenerator.generate – C++98 token-stream backend', () => {
       assert.match(parserCode, /#define MAIACC_TOKEN_COUNT/);
       assert.match(parserCode, /#define MAIACC_TOKEN_Number/);
       assert.match(parserCode, /struct MaiaCCParserToken/);
-      assert.match(parserCode, /class MaiaCCGeneratedParser/);
-      assert.doesNotMatch(parserCode, /class Lexer|module\.exports/);
+      assert.match(parserCode, /struct MaiaCCParserState/);
+      assert.match(parserCode, /maiaCCParserStateInit/);
+      assert.match(parserCode, /static bool maiaCC_parse\(/);
+      assert.doesNotMatch(parserCode, /class MaiaCCGeneratedParser|class Lexer|module\.exports/);
       fs.writeFileSync(parserPath, parserCode);
       fs.writeFileSync(driverPath, `#include "generated-parser.cpp"
 
@@ -383,8 +385,9 @@ int main() {
     &validState, checkpoint, restore, startNonterminal, terminal,
     endNonterminal, abortNonterminal, matchesContextual
   };
-  MaiaCCGeneratedParser validParser(valid, 1, &validEvents);
-  if (!validParser.parse()) return 1;
+  MaiaCCParserState validParser;
+  maiaCCParserStateInit(&validParser, valid, 1, &validEvents);
+  if (!maiaCC_parse(&validParser)) return 1;
   if (validState.starts == 0 || validState.starts != validState.ends) return 2;
   if (validState.aborts != 0 || validState.terminals != 1) return 3;
 
@@ -396,8 +399,9 @@ int main() {
     &invalidState, checkpoint, restore, startNonterminal, terminal,
     endNonterminal, abortNonterminal, matchesContextual
   };
-  MaiaCCGeneratedParser invalidParser(invalid, 1, &invalidEvents);
-  if (invalidParser.parse()) return 4;
+  MaiaCCParserState invalidParser;
+  maiaCCParserStateInit(&invalidParser, invalid, 1, &invalidEvents);
+  if (maiaCC_parse(&invalidParser)) return 4;
   if (invalidState.starts != invalidState.ends + invalidState.aborts) return 5;
   if (invalidState.aborts == 0) return 6;
   return 0;

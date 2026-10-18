@@ -126,22 +126,24 @@ ${tokenArray.join(',\n')}
   MaiaCCParseEvents events = {
     &trace, 0, 0, traceStart, 0, traceEnd, traceAbort, matchesContextual
   };
-  MaiaCCGeneratedParser parser(tokens, ${tokenArray.length}, &events);
-  if (!parser.parse()) {
-    const MaiaCCParserToken* next = parser.position() < parser.tokenCount()
-        ? tokens + parser.position()
+  MaiaCCParserState parser;
+  maiaCCParserStateInit(&parser, tokens, ${tokenArray.length}, &events);
+  if (!maiaCC_parse(&parser)) {
+    const MaiaCCParserToken* next = parser.position < parser.tokenCount
+        ? tokens + parser.position
         : 0;
     printf("parse failed in %s at token %u of %u, type %u (%s), offset %u; deepest failure %s at %u; furthest start %s at %u\\n",
       trace.deepestRule,
-      parser.position(), parser.tokenCount(), next ? next->type : 0,
+        parser.position, parser.tokenCount, next ? next->type : 0,
       next ? maiaCCParserTokenName(next->type) : "none",
       next ? next->start : 0, trace.deepestRule, trace.deepestPosition,
       trace.furthestRule, trace.furthestPosition);
     return 1;
   }
 
-  MaiaCCGeneratedParser emptyParser(0, 0, &events);
-  if (emptyParser.parse()) return 2;
+  MaiaCCParserState emptyParser;
+  maiaCCParserStateInit(&emptyParser, 0, 0, &events);
+  if (maiaCC_parse(&emptyParser)) return 2;
   return 0;
 }
 `;

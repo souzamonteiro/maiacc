@@ -169,13 +169,14 @@ try {
 If you call `parser.parse()` directly, parsing still works, but the thrown error
 message is not enriched by the collector.
 
-The C++98 backend emits `MaiaCCGeneratedParser`, prefixed `MAIACC_TOKEN_*`
-macros, `MaiaCCParserToken`, and `MaiaCCParseEvents`. Its input is a completed token
-array; it does not include or generate a scanner. The event interface supports
-nonterminal/terminal callbacks plus checkpoint/rollback so an application can
-build an AST or parse tree. `parse()` returns `bool`, with `position()` and
-`tokenCount()` exposing progress. The generated source uses C++98 and requires
-exceptions enabled for backtracking (`throw int` / `catch (int)`).
+The C++98 backend emits prefixed `MAIACC_TOKEN_*` macros, `MaiaCCParserToken`,
+`MaiaCCParseEvents`, `MaiaCCParserState`, `maiaCCParserStateInit()`, and free
+`maiaCC_parse_*()` functions. Its input is a completed token array; it does not
+include or generate a scanner. The event interface supports nonterminal/terminal
+callbacks plus checkpoint/rollback so an application can build an AST or parse
+tree. The top-level `maiaCC_parse(&state)` returns `bool`; the state exposes the
+token pointer, count, and current position. The generated source uses C++98 and
+requires exceptions enabled for backtracking (`throw int` / `catch (int)`).
 
 The full test command includes a C++98 self-host integration test: MaiaCC's
 JavaScript REx parser tokenizes `REx.ebnf`, then the generated C++ parser must

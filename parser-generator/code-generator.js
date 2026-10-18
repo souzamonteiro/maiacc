@@ -460,7 +460,9 @@ class CodeGenerator {
   
   generateParser() {
     const templates = this.templates;
-    let code = templates.parserHeader;
+    let code = typeof templates.generateParserHeader === 'function'
+      ? templates.generateParserHeader(this)
+      : templates.parserHeader;
     
     // Add the entry parse method
     code += templates.startRule
