@@ -334,6 +334,7 @@ describe('CodeGenerator.generate – C++98 token-stream backend', () => {
       assert.match(parserCode, /maiaCCParserStateInit/);
       assert.match(parserCode, /static int maiaCC_parse\(/);
       assert.doesNotMatch(parserCode, /\b(?:bool|true|false)\b/);
+      assert.doesNotMatch(parserCode, /\b(?:try|catch|throw)\b/);
       assert.doesNotMatch(parserCode, /class MaiaCCGeneratedParser|class Lexer|module\.exports/);
       fs.writeFileSync(parserPath, parserCode);
       fs.writeFileSync(driverPath, `#include "generated-parser.cpp"
