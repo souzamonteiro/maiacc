@@ -180,7 +180,7 @@ test('C++98 parser accepts the same REx grammar tokenized by the JS self-host pa
     const compiler = findCppCompiler();
     const compile = spawnSync(
       compiler,
-      ['-std=c++98', driverPath, '-o', executablePath],
+      ['-std=c++98', '-I', path.resolve(__dirname, '../../../maiaregex'), path.resolve(__dirname, '../../../maiaregex/maia_regex.c'), driverPath, '-o', executablePath],
       { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
     );
     assert.equal(

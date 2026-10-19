@@ -1,0 +1,3 @@
+[submodule "maiaregex"]
+	path = maiaregex
+	url = https://github.com/souzamonteiro/maiaregex.git

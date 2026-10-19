@@ -1,0 +1,49 @@
+Input ::= Linebreak (CompleteCommand (NewlineList CompleteCommand)* NewlineList?)? EOF
+CompleteCommand ::= List SeparatorOp?
+List ::= AndOr (SeparatorOp AndOr)*
+AndOr ::= Pipeline (AndOrOperator Linebreak Pipeline)*
+AndOrOperator ::= '&&' | '||'
+Pipeline ::= '!'? Command ('|' Linebreak Command)*
+Command ::= SimpleCommand | CompoundCommand Redirection*
+CompoundCommand ::= Subshell | BraceGroup | IfClause | WhileClause | UntilClause | ForClause
+SimpleCommand ::= PrefixItem* CommandName CommandTail* | PrefixItem+
+PrefixItem ::= Assignment | Redirection
+CommandName ::= Word
+CommandTail ::= Redirection | Word
+Assignment ::= ASSIGNMENT_WORD
+Redirection ::= IO_NUMBER? RedirectionOperator Word
+RedirectionOperator ::= '>' | '>>' | '<' | '<>' | '>&' | '<&' | '>|'
+Subshell ::= '(' CompoundList ')'
+BraceGroup ::= '{' CompoundList '}'
+IfClause ::= 'if' CompoundList 'then' CompoundList ('elif' CompoundList 'then' CompoundList)* ('else' CompoundList)? 'fi'
+WhileClause ::= 'while' CompoundList DoGroup
+UntilClause ::= 'until' CompoundList DoGroup
+ForClause ::= 'for' Name Linebreak ('in' WordList?)? (SequentialSeparator | Linebreak) DoGroup
+DoGroup ::= 'do' CompoundList 'done'
+CompoundList ::= Linebreak Term Separator?
+Term ::= AndOr (Separator AndOr)*
+Separator ::= SeparatorOp | NewlineList
+SeparatorOp ::= (';' | '&') Linebreak
+SequentialSeparator ::= ';' Linebreak | NewlineList
+Linebreak ::= NEWLINE*
+NewlineList ::= NEWLINE+
+WordList ::= Word+
+Name ::= NAME^token
+Word ::= WORD | IO_NUMBER | ASSIGNMENT_WORD
+
+<?TOKENS?>
+EOF ::= $
+NAME ::= [A-Za-z_] [A-Za-z0-9_]*
+IO_NUMBER ::= [0-9]+
+ASSIGNMENT_WORD ::= NAME '=' WORD?
+WORD ::= (UnquotedChar | SingleQuoted | DoubleQuoted | EscapedChar)+
+UnquotedChar ::= [#x21] | [#x23-#x25] | [#x2A-#x3A] | [#x3D] | [#x3F-#x5B] | [#x5D-#x5F] | [#x61-#x7A] | [#x7E]
+SingleQuoted ::= #x27 [^#x27]* #x27
+DoubleQuoted ::= #x22 ([^#x22#x5C] | EscapedChar)* #x22
+EscapedChar ::= #x5C [#x20-#x7E]
+NEWLINE ::= #xD #xA | #xA | #xD
+COMMENT ::= '#' [^#xA#xD]* /* ws: definition */
+HORIZONTAL_SPACE ::= [#x20#x9#xB#xC]+ /* ws: definition */
+IO_NUMBER << WORD
+ASSIGNMENT_WORD << WORD
+WORD << NAME

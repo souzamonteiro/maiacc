@@ -2,7 +2,7 @@
 
 ![tREx](images/TyrannosaurusRex.png)
 
-A parser generator that reads XML produced from EBNF grammars and emits a JavaScript lexer/parser or a C++98 parser over caller-provided tokens. JavaScript remains the default backend.
+A parser generator that reads XML produced from EBNF grammars and emits a JavaScript or C++98 lexer/parser. JavaScript remains the default backend. C++98 supports UTF-8 source input as well as caller-provided tokens; see [the generator API](parser-generator/README.md#c98-input-and-events).
 
 ## Process Documentation
 

@@ -216,6 +216,7 @@ class Parser {
     this.position = 0;
     this.errors = [];
     this.eventHandler = eventHandler;
+    this.failureMemo = new Set();
   }
   
   peek(offset = 0) {
@@ -305,6 +306,11 @@ class Parser {
     return result;
   }
   parseGrammar() {
+    const __memoStart = this.position;
+    const __memoKey = 'Grammar@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Grammar at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Grammar', this.position);
     }
@@ -338,6 +344,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Grammar', this.position);
@@ -349,6 +358,11 @@ class Parser {
     }
   }
   parseProlog() {
+    const __memoStart = this.position;
+    const __memoKey = 'Prolog@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Prolog at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Prolog', this.position);
     }
@@ -369,6 +383,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Prolog', this.position);
@@ -380,6 +397,11 @@ class Parser {
     }
   }
   parseProcessingInstruction() {
+    const __memoStart = this.position;
+    const __memoKey = 'ProcessingInstruction@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule ProcessingInstruction at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('ProcessingInstruction', this.position);
     }
@@ -404,6 +426,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('ProcessingInstruction', this.position);
@@ -415,6 +440,11 @@ class Parser {
     }
   }
   parseSyntaxDefinition() {
+    const __memoStart = this.position;
+    const __memoKey = 'SyntaxDefinition@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule SyntaxDefinition at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('SyntaxDefinition', this.position);
     }
@@ -440,6 +470,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('SyntaxDefinition', this.position);
@@ -451,6 +484,11 @@ class Parser {
     }
   }
   parseSyntaxProduction() {
+    const __memoStart = this.position;
+    const __memoKey = 'SyntaxProduction@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule SyntaxProduction at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('SyntaxProduction', this.position);
     }
@@ -474,6 +512,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('SyntaxProduction', this.position);
@@ -485,6 +526,11 @@ class Parser {
     }
   }
   parseSyntaxChoice() {
+    const __memoStart = this.position;
+    const __memoKey = 'SyntaxChoice@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule SyntaxChoice at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('SyntaxChoice', this.position);
     }
@@ -564,6 +610,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('SyntaxChoice', this.position);
@@ -575,6 +624,11 @@ class Parser {
     }
   }
   parseSyntaxSequence() {
+    const __memoStart = this.position;
+    const __memoKey = 'SyntaxSequence@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule SyntaxSequence at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('SyntaxSequence', this.position);
     }
@@ -608,6 +662,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('SyntaxSequence', this.position);
@@ -619,6 +676,11 @@ class Parser {
     }
   }
   parseSyntaxItem() {
+    const __memoStart = this.position;
+    const __memoKey = 'SyntaxItem@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule SyntaxItem at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('SyntaxItem', this.position);
     }
@@ -673,6 +735,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('SyntaxItem', this.position);
@@ -684,6 +749,11 @@ class Parser {
     }
   }
   parseSyntaxPrimary() {
+    const __memoStart = this.position;
+    const __memoKey = 'SyntaxPrimary@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule SyntaxPrimary at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('SyntaxPrimary', this.position);
     }
@@ -729,6 +799,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('SyntaxPrimary', this.position);
@@ -740,6 +813,11 @@ class Parser {
     }
   }
   parseLexicalDefinition() {
+    const __memoStart = this.position;
+    const __memoKey = 'LexicalDefinition@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule LexicalDefinition at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('LexicalDefinition', this.position);
     }
@@ -807,6 +885,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('LexicalDefinition', this.position);
@@ -818,6 +899,11 @@ class Parser {
     }
   }
   parseLexicalProduction() {
+    const __memoStart = this.position;
+    const __memoKey = 'LexicalProduction@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule LexicalProduction at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('LexicalProduction', this.position);
     }
@@ -868,6 +954,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('LexicalProduction', this.position);
@@ -879,6 +968,11 @@ class Parser {
     }
   }
   parseContextChoice() {
+    const __memoStart = this.position;
+    const __memoKey = 'ContextChoice@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule ContextChoice at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('ContextChoice', this.position);
     }
@@ -902,6 +996,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('ContextChoice', this.position);
@@ -913,6 +1010,11 @@ class Parser {
     }
   }
   parseLexicalChoice() {
+    const __memoStart = this.position;
+    const __memoKey = 'LexicalChoice@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule LexicalChoice at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('LexicalChoice', this.position);
     }
@@ -936,6 +1038,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('LexicalChoice', this.position);
@@ -947,6 +1052,11 @@ class Parser {
     }
   }
   parseContextExpression() {
+    const __memoStart = this.position;
+    const __memoKey = 'ContextExpression@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule ContextExpression at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('ContextExpression', this.position);
     }
@@ -968,6 +1078,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('ContextExpression', this.position);
@@ -979,6 +1092,11 @@ class Parser {
     }
   }
   parseLexicalSequence() {
+    const __memoStart = this.position;
+    const __memoKey = 'LexicalSequence@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule LexicalSequence at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('LexicalSequence', this.position);
     }
@@ -1063,6 +1181,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('LexicalSequence', this.position);
@@ -1074,6 +1195,11 @@ class Parser {
     }
   }
   parseLexicalItem() {
+    const __memoStart = this.position;
+    const __memoKey = 'LexicalItem@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule LexicalItem at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('LexicalItem', this.position);
     }
@@ -1128,6 +1254,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('LexicalItem', this.position);
@@ -1139,6 +1268,11 @@ class Parser {
     }
   }
   parseLexicalPrimary() {
+    const __memoStart = this.position;
+    const __memoKey = 'LexicalPrimary@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule LexicalPrimary at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('LexicalPrimary', this.position);
     }
@@ -1240,6 +1374,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('LexicalPrimary', this.position);
@@ -1251,6 +1388,11 @@ class Parser {
     }
   }
   parseNameOrString() {
+    const __memoStart = this.position;
+    const __memoKey = 'NameOrString@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule NameOrString at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('NameOrString', this.position);
     }
@@ -1306,6 +1448,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('NameOrString', this.position);
@@ -1317,6 +1462,11 @@ class Parser {
     }
   }
   parseContext() {
+    const __memoStart = this.position;
+    const __memoKey = 'Context@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Context at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Context', this.position);
     }
@@ -1326,6 +1476,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Context', this.position);
@@ -1337,6 +1490,11 @@ class Parser {
     }
   }
   parseCharClass() {
+    const __memoStart = this.position;
+    const __memoKey = 'CharClass@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule CharClass at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('CharClass', this.position);
     }
@@ -1436,6 +1594,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('CharClass', this.position);
@@ -1447,6 +1608,11 @@ class Parser {
     }
   }
   parseOption() {
+    const __memoStart = this.position;
+    const __memoKey = 'Option@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Option at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Option', this.position);
     }
@@ -1489,6 +1655,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Option', this.position);
@@ -1500,6 +1669,11 @@ class Parser {
     }
   }
   parsePreference() {
+    const __memoStart = this.position;
+    const __memoKey = 'Preference@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Preference at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Preference', this.position);
     }
@@ -1596,6 +1770,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Preference', this.position);
@@ -1607,6 +1784,11 @@ class Parser {
     }
   }
   parseDelimiter() {
+    const __memoStart = this.position;
+    const __memoKey = 'Delimiter@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Delimiter at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Delimiter', this.position);
     }
@@ -1647,6 +1829,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Delimiter', this.position);
@@ -1658,6 +1843,11 @@ class Parser {
     }
   }
   parseEquivalence() {
+    const __memoStart = this.position;
+    const __memoKey = 'Equivalence@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Equivalence at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Equivalence', this.position);
     }
@@ -1670,6 +1860,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Equivalence', this.position);
@@ -1681,6 +1874,11 @@ class Parser {
     }
   }
   parseEquivalenceCharRange() {
+    const __memoStart = this.position;
+    const __memoKey = 'EquivalenceCharRange@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule EquivalenceCharRange at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('EquivalenceCharRange', this.position);
     }
@@ -1764,6 +1962,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('EquivalenceCharRange', this.position);
@@ -1775,6 +1976,11 @@ class Parser {
     }
   }
   parseEncore() {
+    const __memoStart = this.position;
+    const __memoKey = 'Encore@' + __memoStart;
+    if (this.failureMemo.has(__memoKey)) {
+      throw new Error('Previously failed rule Encore at position ' + __memoStart);
+    }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('Encore', this.position);
     }
@@ -1796,6 +2002,9 @@ class Parser {
 
       __ok = true;
     } finally {
+      if (!__ok) {
+        this.failureMemo.add(__memoKey);
+      }
       if (this.eventHandler) {
         if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
           this.eventHandler.endNonterminal('Encore', this.position);

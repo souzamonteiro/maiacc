@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
 const root = __dirname;
-const ebnfFile = path.join(root, '../REx.ebnf');
+const ebnfFile = path.join(root, '../grammar/REx.ebnf');
 const rexMain = path.join(root, '../tools/REx-main.js');
 const rexCli = path.join(root, 'REx.js');
 
@@ -66,7 +66,7 @@ function main() {
   runNode(['-e', `
     const fs = require('fs');
     const Parser = require('./rex-parser');
-    const input = fs.readFileSync('../REx.ebnf', 'utf8');
+    const input = fs.readFileSync('../grammar/REx.ebnf', 'utf8');
     new Parser(input).parse();
     console.log('OK: rex-parser.js parsed REx.ebnf');
   `]);
@@ -78,14 +78,14 @@ function main() {
   console.log(`OK: wrote ${path.basename(grammarTestXml)}`);
 
   printStep('3) Generate rex-parser-test.js from rex-grammar-test.xml');
-  runNode(['index.js', grammarTestXml, parserTest]);
+  runNode(['parser-generator.js', grammarTestXml, parserTest]);
   console.log(`OK: wrote ${path.basename(parserTest)}`);
 
   printStep('4) Parse REx.ebnf with rex-parser-test.js');
   runNode(['-e', `
     const fs = require('fs');
     const Parser = require('./rex-parser-test');
-    const input = fs.readFileSync('../REx.ebnf', 'utf8');
+    const input = fs.readFileSync('../grammar/REx.ebnf', 'utf8');
     new Parser(input).parse();
     console.log('OK: rex-parser-test.js parsed REx.ebnf');
   `]);

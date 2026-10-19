@@ -1,13 +1,13 @@
 # MaiaCC Parser Generator
 
-A parser generator that reads XML produced from EBNF grammars and emits a JavaScript lexer/parser or a C++98 parser over a caller-provided token stream. JavaScript remains the default backend.
+A parser generator that reads XML produced from EBNF grammars and emits a JavaScript or C++98 lexer/parser. JavaScript remains the default backend.
 
-The additive C++98 backend reuses the grammar model and production traversal; it intentionally leaves tokenization to the application so context-sensitive scanners can be supplied.
+Both backends use the same selected lexical patterns and ordering. The C++98 backend generates a UTF-8 scanner and retains the caller-provided token-stream API for existing integrations.
 
 ## Current status
 
 - Generates JavaScript lexer/parsers from EBNF-derived XML.
-- Generates C++98 parser classes and prefixed token-ID macros from the same grammar model.
+- Generates C++98 lexer/parser functions and prefixed token-ID macros from the same grammar model.
 - Handles syntax and lexical rules (including groups and quantifiers).
 - Supports skip tokens (for example, whitespace via `/* ws: definition */`).
 - Includes unit and integration tests.
@@ -25,6 +25,7 @@ The additive C++98 backend reuses the grammar model and production traversal; it
 - `code-generator.js`: Selects a target backend and walks the parsed grammar.
 - `templates/javascript.js`: JavaScript lexer/parser templates.
 - `templates/cpp98.js`: C++98 parser/token-stream templates.
+- `templates/cpp98-lexer.js`: Lexical-pattern compiler and C++98 scanner runtime template.
 - `sample-grammar.ebnf`: Example grammar.
 - `build.sh`: Example generation pipeline.
 - `tests/unit`: Unit tests for parser and generator internals.
@@ -68,7 +69,7 @@ bash bin/tREx.sh --ebnf parser-generator/examples/sample-grammar.ebnf parser-gen
 # EBNF -> XML only
 bash bin/tREx.sh --ebnf --only-xml --to-xml parser-generator/examples/grammar.xml parser-generator/examples/sample-grammar.ebnf
 
-# EBNF -> XML -> C++98 parser (scanner is supplied by the application)
+# EBNF -> XML -> C++98 lexer/parser
 bash bin/tREx.sh --ebnf --language cpp98 parser-generator/examples/sample-grammar.ebnf parser.cpp
 ```
 
@@ -169,21 +170,68 @@ try {
 If you call `parser.parse()` directly, parsing still works, but the thrown error
 message is not enriched by the collector.
 
-The C++98 backend emits prefixed `MAIACC_TOKEN_*` macros, `MaiaCCParserToken`,
-`MaiaCCParseEvents`, `MaiaCCParserState`, `maiaCCParserStateInit()`, and free
-`maiaCC_parse_*()` functions. Its input is a completed token array; it does not
-include or generate a scanner. The event interface supports nonterminal/terminal
-callbacks plus checkpoint/rollback so an application can build an AST or parse
-tree. The top-level `maiaCC_parse(&state)` returns `bool`; the state exposes the
-token pointer, count, and current position. The generated source uses C++98 and
-requires exceptions enabled for backtracking (`throw int` / `catch (int)`).
+### C++98 Input And Events
 
-The full test command includes a C++98 self-host integration test: MaiaCC's
-JavaScript REx parser tokenizes `REx.ebnf`, then the generated C++ parser must
-accept that token stream and reject an empty one. The test compiles with an
-available native C++ compiler; it skips explicitly when none is installed.
-This validates MaiaCC's generated source, not the downstream MaiaCpp pipeline,
-which must consume MaiaCC through its synchronized in-repository submodule.
+The C++98 backend emits prefixed `MAIACC_TOKEN_*` macros, `MaiaCCParserToken`,
+`MaiaCCParseEvents`, lexer/parser states and free functions. Generate the source
+with `--language cpp98`, then include it in the consumer's translation unit.
+The generated lexer uses the MaiaRegex C89 runtime from the pinned `maiaregex`
+submodule. Initialize clones with `git submodule update --init --recursive`.
+The npm package also includes `maiaregex/maia_regex.h` and `maia_regex.c`.
+Compile/link that source and add its directory to the include path, for example:
+
+```bash
+c++ -std=c++98 -I maiaregex application.cpp maiaregex/maia_regex.c -o application
+```
+
+```cpp
+MaiaCCParserToken tokens[1024];
+MaiaCCLexerState lexer;
+maiaCCLexerStateInit(&lexer, source, sourceByteLength);
+if (maiaCCLexerTokenize(&lexer, tokens, 1024)) {
+  MaiaCCParserState parser;
+  maiaCCParserStateInit(&parser, tokens, lexer.tokenCount, 0);
+  bool accepted = maiaCC_parse(&parser);
+}
+```
+
+The token capacity includes EOF. Token `value` points into the original UTF-8
+source, which must remain alive while tokens are used. Token `length` and lexer
+`bytePosition` count bytes; token `start`/`end` and lexer `position` count UTF-16
+code units, matching JavaScript offsets. Invalid UTF-8 is rejected. Lexer
+`failed` is 0 on success, 1 for invalid/unmatched input, 2 for allocation or size
+failure, and 3 for insufficient token capacity. No partial token stream should
+be parsed after failure. States can be reused by calling tokenize again.
+
+The scanner generates ordered pattern instructions from the shared lexical
+patterns, including greedy/lazy repetition, classes, lookahead, skip and
+priority rules, character-class preferences and template-interpolation modes.
+Unsupported pattern constructs fail generation instead of silently broadening
+the accepted language. Scanner scratch storage and parser failure memoization
+use standard allocation functions. Pattern matching is iterative and lives in
+MaiaRegex; grammar traversal is recursive. Input size and grammar nesting must
+fit the target's memory and stack limits. The generated scanner currently uses
+the runtime without caller-imposed limits; the standalone MaiaRegex API also
+supports finite memo-memory, frame and work limits.
+
+Existing applications can still pass their own completed token arrays directly
+to `maiaCCParserStateInit()`. `maiaCC_parse()` returns `bool`, accepts an optional
+trailing EOF when the start rule does not consume it, and does not require C++
+exceptions. State fields `errorCount`, `errorPosition`, `expectedToken` and
+`foundToken` retain the first failed expectation, including speculative failures
+as in JavaScript; `errorPosition` is a token-array index, not a source offset.
+Always use the returned result to decide success, not `errorCount` alone.
+
+The event interface supports nonterminal/terminal callbacks and checkpoint/
+rollback for application-owned trees. Contextual `^token` matching uses the
+generated lexical patterns and still supports an optional application callback.
+
+The full suite compares tokens, source spans, complete event trees and first
+syntax errors from independently scanned C++/JavaScript source corpora, including
+REx self-hosting and a shell grammar. It retains the legacy pre-tokenized test.
+Tests use a native C++98 compiler and skip explicitly if none is available.
+Downstream MaiaCpp/WASM compatibility remains a separate integration gate using
+each consumer's synchronized in-repository submodules.
 
 ---
 
@@ -191,7 +239,8 @@ which must consume MaiaCC through its synchronized in-repository submodule.
 
 - Grammar contexts/lookaheads are still simplified vs full REx semantics.
 - Some context-sensitive lexical behaviors may require additional stateful lexer modes.
-- The C++98 backend has no lexer, formatted diagnostics, or automatic AST.
+- The C++98 backend exposes numeric diagnostics and tree events, not formatted
+  line/column messages or an automatically allocated AST.
 - MaiaCpp pipeline compatibility is a downstream integration check; the
   generator's C++ output is currently verified with a native C++98 compiler.
 

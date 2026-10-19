@@ -329,6 +329,17 @@ class CodeGenerator {
     }
 
     let code = templates.lexerHeader;
+    for (const token of this.collectLexerPatterns()) {
+      code += (token.isSkip ? templates.skipToken : templates.token)
+        .replace(/{{name}}/g, token.name)
+        .replace(/{{pattern}}/g, () => token.pattern);
+    }
+    code += templates.lexerFooter;
+    return code;
+  }
+
+  collectLexerPatterns() {
+    const patterns = [];
     const emitted = new Set();
     const referencedLexicalTokens = this.collectReferencedLexicalTokens();
     const orderedLexicalNames = this.getOrderedLexicalTokenNames();
@@ -337,9 +348,7 @@ class CodeGenerator {
     for (const [value, token] of this.tokenMap) {
       if (token.source === 'literal' && token.pattern && !this.regexCanMatchEmpty(token.pattern) && !token.isSkip && !emitted.has(token.name)) {
         emitted.add(token.name);
-        code += templates.token
-          .replace(/{{name}}/g, token.name)
-          .replace(/{{pattern}}/g, token.pattern);
+        patterns.push({ ...token, isSkip: false });
       }
     }
     
@@ -364,21 +373,12 @@ class CodeGenerator {
 
         if (pattern && !this.regexCanMatchEmpty(pattern)) {
           emitted.add(name);
-          if (token.isSkip) {
-            code += templates.skipToken
-              .replace(/{{name}}/g, name)
-              .replace(/{{pattern}}/g, pattern);
-          } else {
-            code += templates.token
-              .replace(/{{name}}/g, name)
-              .replace(/{{pattern}}/g, pattern);
-          }
+          patterns.push({ ...this.tokenMap.get(name), pattern, isSkip: Boolean(token.isSkip) });
         }
       }
     }
     
-    code += templates.lexerFooter;
-    return code;
+    return patterns;
   }
 
   getOrderedLexicalTokenNames() {
@@ -484,6 +484,7 @@ class CodeGenerator {
     return this.renderTemplate(templates.ruleFunction, {
       ruleName: this.mapRuleName(rule.name),
       ruleLabel: this.stringLiteral(rule.name),
+      ruleId: String([...this.grammar.rules.keys()].indexOf(rule.name)),
       ruleBody: body
     });
   }

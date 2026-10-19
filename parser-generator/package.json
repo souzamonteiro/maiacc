@@ -9,9 +9,9 @@
     "build:safe": "bash build.sh --no-promote",
     "build:selfhost": "bash build.sh",
     "rex": "node ../tools/REx-main.js",
-    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js",
+    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js tests/integration/cpp98-lexer.test.js",
     "test:unit": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js",
-    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js",
+    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js tests/integration/cpp98-lexer.test.js",
     "selfhost:test": "node selfhost-validate.js"
   },
   "dependencies": {

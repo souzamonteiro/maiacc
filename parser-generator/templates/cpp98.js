@@ -1,5 +1,7 @@
 'use strict';
 
+const { generateScanner } = require('./cpp98-lexer');
+
 function cppIdentifier(value) {
   return String(value).replace(/[^A-Za-z0-9_]/g, (character) =>
     `_x${character.codePointAt(0).toString(16)}_`,
@@ -40,6 +42,7 @@ function generateBoundaryCheck(generator) {
 function generateLexer(generator) {
   let code = module.exports.lexerHeader;
   const tokens = [...generator.tokenMap.values()];
+  if (!generator.tokenMap.has('EOF')) tokens.push({ name: 'EOF', id: tokens.length + 1 });
 
   for (const token of tokens) {
     code += generator.renderTemplate(module.exports.token, {
@@ -50,6 +53,7 @@ function generateLexer(generator) {
 
   code += generator.renderTemplate(module.exports.lexerFooter, {
     tokenCount: String(tokens.length + 1),
+    ruleCount: String(generator.grammar.rules.size),
     tokenCases: tokens
       .map((token) => `    case ${mapTokenName(token.name)}: return ${cppStringLiteral(token.name)};`)
       .join('\n'),
@@ -57,7 +61,7 @@ function generateLexer(generator) {
       .map((name) => `static int ${mapRuleName(name)}(MaiaCCParserState* self);`)
       .join('\n'),
   });
-  return code;
+  return code.replace('/* MAIACC_SCANNER */', () => generateScanner(generator));
 }
 
 module.exports = {
@@ -71,10 +75,14 @@ module.exports = {
   lexerHeader: `#ifndef MAIACC_GENERATED_CPP98_PARSER_H
 #define MAIACC_GENERATED_CPP98_PARSER_H
 
+#include <stdlib.h>
+#include "maia_regex.h"
+
 `,
   token: `#define {{tokenName}} {{id}}
 `,
   lexerFooter: `#define MAIACC_TOKEN_COUNT {{tokenCount}}
+#define MAIACC_RULE_COUNT {{ruleCount}}
 
 static const char* maiaCCParserTokenName(unsigned int type) {
   switch (type) {
@@ -90,6 +98,8 @@ struct MaiaCCParserToken {
   unsigned int start;
   unsigned int end;
 };
+
+/* MAIACC_SCANNER */
 
 struct MaiaCCParseEvents {
   void* context;
@@ -108,6 +118,11 @@ struct MaiaCCParserState {
   unsigned int position;
   const MaiaCCParseEvents* events;
   int failed;
+  unsigned int errorCount;
+  unsigned int errorPosition;
+  unsigned int expectedToken;
+  unsigned int foundToken;
+  unsigned char* failureMemo;
 };
 
 static void maiaCCParserStateInit(
@@ -120,10 +135,25 @@ static void maiaCCParserStateInit(
   self->position = 0;
   self->events = events;
   self->failed = 0;
+  self->errorCount = 0;
+  self->errorPosition = 0;
+  self->expectedToken = 0;
+  self->foundToken = 0;
+  self->failureMemo = 0;
 }
 
 static const MaiaCCParserToken* maiaCC_peek(const MaiaCCParserState* self) {
   return self->position < self->tokenCount ? self->tokens + self->position : 0;
+}
+
+static void maiaCC_recordError(MaiaCCParserState* self, unsigned int expected) {
+  if (self->errorCount == 0) {
+    const MaiaCCParserToken* token = maiaCC_peek(self);
+    self->errorPosition = self->position;
+    self->expectedToken = expected;
+    self->foundToken = token ? token->type : MAIACC_TOKEN_EOF;
+  }
+  ++self->errorCount;
 }
 
 static unsigned int maiaCC_checkpointEvents(const MaiaCCParserState* self) {
@@ -181,11 +211,12 @@ static int maiaCC_matchToken(MaiaCCParserState* self, unsigned int expected) {
 static int maiaCC_matchContextualToken(MaiaCCParserState* self, unsigned int expected) {
   if (self->failed) return 0;
   const MaiaCCParserToken* token = maiaCC_peek(self);
-  if (!token) return 0;
+  if (!token) { maiaCC_recordError(self, expected); return 0; }
   const int accepted = token->type == expected
+      || maiaCCLexMatchesContextual(expected, token)
       || (self->events && self->events->matchesContextual
           && self->events->matchesContextual(self->events->context, expected, token));
-  if (!accepted) return 0;
+  if (!accepted) { maiaCC_recordError(self, expected); return 0; }
   maiaCC_emitTerminal(self, token);
   ++self->position;
   return 1;
@@ -193,6 +224,7 @@ static int maiaCC_matchContextualToken(MaiaCCParserState* self, unsigned int exp
 
 static int maiaCC_expectToken(MaiaCCParserState* self, unsigned int expected) {
   if (maiaCC_matchToken(self, expected)) return 1;
+  maiaCC_recordError(self, expected);
   self->failed = 1;
   return 0;
 }
@@ -210,7 +242,18 @@ static int maiaCC_expectContextualToken(MaiaCCParserState* self, unsigned int ex
   startRule: `static int maiaCC_parse(MaiaCCParserState* self) {
   self->position = 0;
   self->failed = 0;
-  return {{startRule}}(self) && !self->failed && self->position == self->tokenCount;
+  self->errorCount = 0;
+  size_t columns = (size_t)self->tokenCount + 1;
+  if (columns == 0 || MAIACC_RULE_COUNT > ((size_t)-1) / columns) { self->failed = 1; return 0; }
+  self->failureMemo = (unsigned char*)calloc(MAIACC_RULE_COUNT, columns);
+  if (!self->failureMemo) { self->failed = 1; return 0; }
+  int accepted = {{startRule}}(self) && !self->failed;
+  if (accepted) accepted = self->position == self->tokenCount
+      || (self->position + 1 == self->tokenCount
+          && maiaCC_peek(self)->type == MAIACC_TOKEN_EOF);
+  free(self->failureMemo);
+  self->failureMemo = 0;
+  return accepted;
 }
 `,
   parserFooter: `
@@ -221,6 +264,8 @@ static int maiaCC_expectContextualToken(MaiaCCParserState* self, unsigned int ex
 static int {{ruleName}}(MaiaCCParserState* self) {
   if (self->failed) return 0;
   const unsigned int __ruleStart = self->position;
+  const size_t __memoSlot = (size_t){{ruleId}} * ((size_t)self->tokenCount + 1) + __ruleStart;
+  if (self->failureMemo && self->failureMemo[__memoSlot]) { self->failed = 1; return 0; }
   const unsigned int __eventMark = maiaCC_checkpointEvents(self);
   maiaCC_startNonterminal(self, {{ruleLabel}});
 {{ruleBody}}  if (!self->failed) {
@@ -228,6 +273,7 @@ static int {{ruleName}}(MaiaCCParserState* self) {
     return 1;
   }
   self->position = __ruleStart;
+  if (self->failureMemo) self->failureMemo[__memoSlot] = 1;
   maiaCC_restoreEvents(self, __eventMark);
   maiaCC_abortNonterminal(self, {{ruleLabel}});
   return 0;
