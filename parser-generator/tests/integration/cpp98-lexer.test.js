@@ -15,7 +15,9 @@ const regexArgs = ['-I', regexRoot, path.join(regexRoot, 'maia_regex.c')];
 const { compilePattern } = require('../../templates/cpp98-lexer.js');
 
 test('MaiaRegex programs preserve JavaScript ordered paths, empty repetitions, assertions and UTF-16 units', () => {
-  const patterns = ['a|aa', 'aa|a', 'a*', 'a*?', 'a+?', '(?:a?)*b', '(?:a?)*?b',
+  const patterns = ['(a|aa)b', '(a*)*b', '(a|)*b', 'a(?=b)', 'a(?!b)', '(a|aa)*b', '[^a-z]+',
+    '(?=(a*)*b)a*', '(?!(a|)*b)a*', '(?:(?=a?)a?)*b', '(?:(?!b)a*)*b',
+    'a|aa', 'aa|a', 'a*', 'a*?', 'a+?', '(?:a?)*b', '(?:a?)*?b',
     '(?:a|aa)*b', '(?:a|aa)*?b', '(?=a)a+', '(?!b)a*', '(?:(?=a)a)*',
     '(?!a*)b', '(?:a?)*', '(?:a?)*?', '$', 'a$', '[^a]+', '[\\s\\S]',
     '[\\s\\S]*?', '\\u00e9+', '[\\d\\s]+', '(?:ab|a)b?', '.+'];
