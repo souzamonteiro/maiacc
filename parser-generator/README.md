@@ -4,6 +4,11 @@ A parser generator that reads XML produced from EBNF grammars and emits a JavaSc
 
 Both backends use the same selected lexical patterns and ordering. The C++98 backend generates a UTF-8 scanner and retains the caller-provided token-stream API for existing integrations.
 
+A parallel [C++98 REx frontend and collector](cpp98/README.md) now reproduce
+the JavaScript frontend's XML and remain stable across two generated parser
+seeds. JavaScript still supplies the code emitter; complete C++ self-hosting
+and the full WASM bootstrap are subsequent gates.
+
 ## Current status
 
 - Generates JavaScript lexer/parsers from EBNF-derived XML.

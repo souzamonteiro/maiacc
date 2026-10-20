@@ -9,10 +9,11 @@
     "build:safe": "bash build.sh --no-promote",
     "build:selfhost": "bash build.sh",
     "rex": "node ../tools/REx-main.js",
-    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js tests/integration/cpp98-lexer.test.js",
+    "test": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js tests/integration/cpp98-lexer.test.js tests/integration/cpp98-rex-frontend.test.js",
     "test:unit": "node --test --test-reporter=spec tests/unit/grammar-parser.test.js tests/unit/code-generator.test.js",
-    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js tests/integration/cpp98-lexer.test.js",
-    "selfhost:test": "node selfhost-validate.js"
+    "test:integration": "node --test --test-reporter=spec tests/integration/arithmetic.test.js tests/integration/cpp98-selfhost.test.js tests/integration/cpp98-lexer.test.js tests/integration/cpp98-rex-frontend.test.js",
+    "selfhost:test": "node selfhost-validate.js",
+    "test:cpp98-frontend": "node --test tests/integration/cpp98-rex-frontend.test.js"
   },
   "dependencies": {
     "xml2js": "^0.6.2"
