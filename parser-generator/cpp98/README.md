@@ -1,6 +1,6 @@
-# C++98 MaiaCC bootstrap
+# C++98 MaiaCC generator and bootstrap
 
-This directory starts the parallel C++98 implementation. JavaScript remains
+This directory contains the parallel C++98 implementation. JavaScript remains
 the default and the behavioral reference. All syntax and lexical rules come
 from `grammar/REx.ebnf`, generated through MaiaCC/tREx. The frontend uses the
 repository-local MaiaRegex instruction runtime. No handwritten EBNF scanner or
@@ -12,20 +12,45 @@ Implemented here:
   checkpoints, rollback, sticky allocation errors and XML serialization.
 - `REx.cpp`: input-buffer to XML frontend using the generated lexer/parser.
 - `REx-main.cpp`: separate native file/literal-input and output transport.
-- `build.sh`: JavaScript-seeded native bootstrap; generated artifacts stay in
-  the explicitly selected build directory.
+- `xml.ebnf` / `xml-input.cpp`: generated XML input parser and semantic tree
+  adapter for the REx XML interchange format (elements, text, declaration,
+  predefined and numeric entities, BOM and document whitespace). This is not
+  a general XML/DTD/attribute-processing library.
+- `grammar-model.hpp`: grammar rules, lexical patterns, quantifiers, contexts,
+  whitespace options, lexical differences and preferences.
+- `code-generator.hpp`, `regex-compiler.hpp`, `source-emitter.hpp`: grammar
+  traversal, ordered MaiaRegex program construction and both output backends.
+- `model.hpp`: invocation arena and length-bearing text/buffer storage.
+- `template-assets.hpp`: C++ source data for the established backend templates.
+  `node parser-generator/cpp98/template-assets.js --check` verifies source parity;
+  the native generator never runs that development-time synchronization tool.
+- `generator.cpp` / `generator-main.cpp`: XML-buffer generation and native file
+  transport; the default output language remains JavaScript.
+- `build.sh`: generation zero, using JavaScript to emit the two parser seeds.
+- `bootstrap.sh`: later complete native generations, using only the preceding
+  C++ executables, EBNF and C++ sources. Generated artifacts stay in the
+  explicitly selected build directories.
 
 ```sh
 sh parser-generator/cpp98/build.sh /tmp/maiacc-cpp98-build
 /tmp/maiacc-cpp98-build/REx-cpp98 grammar/REx.ebnf > /tmp/rex-cpp98.xml
-npm --prefix parser-generator run test:cpp98-frontend
+/tmp/maiacc-cpp98-build/MaiaCC-cpp98 --language cpp98 /tmp/rex-cpp98.xml /tmp/rex-parser.cpp
+sh parser-generator/cpp98/bootstrap.sh /tmp/maiacc-cpp98-build /tmp/maiacc-cpp98-generation-1
+sh parser-generator/cpp98/bootstrap.sh /tmp/maiacc-cpp98-generation-1 /tmp/maiacc-cpp98-generation-2
+sh bin/tREx-cpp98.sh --build-dir /tmp/maiacc-cpp98-generation-2 --ebnf \
+  --to-xml /tmp/sample.xml --language cpp98 \
+  parser-generator/examples/sample-grammar.ebnf /tmp/sample-parser.cpp
+npm --prefix parser-generator run test:cpp98-generator
 ```
 
-The regression compares XML byte for byte with `REx.js` on REx, WAT, shell,
-sample grammar, BOM/CRLF/escaped text and rejected inputs. It uses native XML
-to seed a second generated C++ lexer/parser and requires identical parser source
-and XML. The JavaScript **code generator** still creates both parser seeds.
-That emitter must be ported before claiming a completely C++ self-hosted MaiaCC.
+The frontend regression compares XML byte for byte with `REx.js`. The complete
+generator regression compares both output languages against the JavaScript
+reference on REx, XML, WAT, shell, arithmetic and additional lexical/Unicode
+grammars, including formatted XML. It then rebuilds the complete native pair
+twice and requires stable parser sources and XML. A failing `node` executable
+heads PATH during the native bootstrap/wrapper checks. Generated JavaScript is
+executed on accepted/rejected arithmetic input, and malformed XML must fail
+without overwriting an existing output file.
 
 The collector stores references into the live input and generated parser labels.
 Serialize before releasing the input. Its XML traversal is iterative, while the
@@ -34,7 +59,8 @@ across parser rollback. The native CLI supports multiple files, literal inputs
 in braces, and the compatibility `-i` flag. Legacy REx validation and formatted
 source-location diagnostics have not been ported to this CLI.
 
-Still required: C++ grammar-model construction and code generation, complete CLI
-parity, self-generation without the JavaScript emitter, and the same bootstrap
-executed through MaiaCpp -> C89 -> MaiaC -> WebAssembly. Native frontend parity
-does not certify any of those later gates or complete shell execution.
+The complete native generator is implemented; the full generator WebAssembly
+bootstrap is still being validated. The published WASM REx frontend is an
+earlier, separate gate. Do not infer complete WASM self-hosting or shell execution
+from native source parity. The legacy REx diagnostic/validation CLI and general
+XML features outside the REx interchange format remain separate limitations.

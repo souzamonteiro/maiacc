@@ -4,6 +4,11 @@
 
 A parser generator that reads XML produced from EBNF grammars and emits a JavaScript or C++98 lexer/parser. JavaScript remains the default backend. C++98 supports UTF-8 source input as well as caller-provided tokens; see [the generator API](parser-generator/README.md#c98-input-and-events).
 
+The parallel [C++98 implementation](parser-generator/cpp98/README.md) includes
+the frontend, grammar model and both emitters, with stable complete native
+bootstrap generations. Use `bin/tREx-cpp98.sh` after its explicit bootstrap build.
+Full generator execution through MaiaCpp/MaiaC to WASM is a separate validation gate.
+
 ## Process Documentation
 
 Mandatory cross-repository synchronization workflow:

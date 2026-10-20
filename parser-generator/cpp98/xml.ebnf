@@ -1,0 +1,15 @@
+Document ::= XmlBom? XmlSpace? Declaration? XmlSpace? Element XmlSpace? EOF
+Element ::= OpenTag Content CloseTag | EmptyTag
+OpenTag ::= '<' XmlName '>'
+CloseTag ::= '</' XmlName '>'
+EmptyTag ::= '<' XmlName '/>'
+Content ::= (Element | TextPiece)*
+TextPiece ::= XmlName | XmlSpace | XmlBom | Character | '>' | '/>'
+
+<?TOKENS?>
+Declaration ::= '<?xml' [^<]* '?>'
+XmlSpace ::= [#x9#xA#xD#x20]+
+XmlBom ::= #xFEFF
+XmlName ::= [A-Za-z_] [A-Za-z_0-9.:-]*
+Character ::= [^<]
+EOF ::= $
