@@ -59,8 +59,29 @@ across parser rollback. The native CLI supports multiple files, literal inputs
 in braces, and the compatibility `-i` flag. Legacy REx validation and formatted
 source-location diagnostics have not been ported to this CLI.
 
-The complete native generator is implemented; the full generator WebAssembly
-bootstrap is still being validated. The published WASM REx frontend is an
-earlier, separate gate. Do not infer complete WASM self-hosting or shell execution
-from native source parity. The legacy REx diagnostic/validation CLI and general
-XML features outside the REx interchange format remain separate limitations.
+The complete WebAssembly bootstrap gate belongs to the principal MaiaCpp
+repository and uses its own published MaiaCC, MaiaC, MaiaWASM and MaiaRegex
+submodules:
+
+```sh
+# From the principal MaiaCpp repository, after protocol synchronization:
+MAIACPP_SELFHOST_KEEP_TEMP=1 npm run check:maiaCC-selfhost-wasm
+```
+
+It compiles the unchanged frontend and generator C++98 sources through MaiaCpp
+to C89 and through MaiaC/MaiaWASM to executable WASM. JavaScript supplies only
+generation-zero parser seeds and comparison oracles. Each subsequent generation
+uses the preceding guest frontend and guest generator to recreate both parser
+seeds; all three complete generations must reproduce the reference sources.
+The final guest must match both emitted languages for REx, XML, WAT, shell and
+the sample grammar, reject malformed input, restore its stack and exercise real
+memory growth. Host imports provide memory transport, not parsing or emission.
+
+The strict C89 syntax gate suppresses only the minimum string-length diagnostic
+(`-Wno-overlength-strings`): compiled template assets exceed the C89 minimum
+required 509-character literal capacity. No C99 syntax is required.
+This bootstrap validates the generator and compiler pipeline on this corpus;
+it does not certify every C++98/WebAssembly feature or MaiaOS shell execution.
+Legacy REx diagnostic/validation CLI options and general XML features outside
+the REx interchange format remain separate limitations. JavaScript remains the
+stable default tool; the C++98 implementation is available alongside it.
