@@ -18,6 +18,8 @@ Implemented here:
   a general XML/DTD/attribute-processing library.
 - `grammar-model.hpp`: grammar rules, lexical patterns, quantifiers, contexts,
   whitespace options, lexical differences and preferences.
+  Positive lexical `A & B` context is retained as a typed assertion and emitted
+  without consuming B, identically to the JavaScript grammar model/generator.
 - `code-generator.hpp`, `regex-compiler.hpp`, `source-emitter.hpp`: grammar
   traversal, ordered MaiaRegex program construction and both output backends.
 - `model.hpp`: invocation arena and length-bearing text/buffer storage.

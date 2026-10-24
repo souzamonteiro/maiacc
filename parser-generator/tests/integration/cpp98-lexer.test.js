@@ -222,6 +222,61 @@ test('C++98 lexer self-hosts REx directly from UTF-8 source with matching tokens
   compareSourceCorpus(grammar, [input]);
 });
 
+test('REx lexical & context is a zero-width assertion with groups, references, quantifiers and fallback', async () => {
+  const grammar = await grammarFromEbnf(fs.readFileSync(path.resolve(__dirname, '../fixtures/lexical-context.ebnf'), 'utf8'));
+  const assertion = grammar.tokens.get('Guarded').patterns[0].at(-1);
+  assert.equal(assertion.type, 'lookahead');
+  assert.equal(assertion.operand.type, 'tokenRef');
+  assert.equal(assertion.operand.value, 'Boundary');
+  assert.equal(assertion.operand.quantifier, 'oneOrMore');
+  const generator = new CodeGenerator(grammar);
+  const module = { exports: {} };
+  vm.runInNewContext(generator.generate(), { module, structuredClone });
+  const cases = [
+    ['ab:', [['Guarded', 'ab', 0, 2], ['TOKEN__3A_', ':', 2, 3]]],
+    ['abab!!', [['Guarded', 'abab', 0, 4], ['TOKEN__21_', '!', 4, 5], ['TOKEN__21_', '!', 5, 6]]],
+    ['ab!', [['Loose', 'ab', 0, 2], ['TOKEN__21_', '!', 2, 3]]],
+    ['ab', [['Loose', 'ab', 0, 2]]],
+    ['ab :', [['Loose', 'ab', 0, 2], ['TOKEN__3A_', ':', 3, 4]]],
+    ['abxy:', [['Loose', 'abxy', 0, 4], ['TOKEN__3A_', ':', 4, 5]]],
+    ['xy', [['Guarded', 'xy', 0, 2]]],
+  ];
+  for (const [input, expected] of cases) {
+    const parser = new module.exports(input);
+    assert.deepEqual(Array.from(parser.tokens).filter(t => t.type !== 'EOF').map(t => [t.type, t.value, t.start, t.end]), expected, input);
+    assert.doesNotThrow(() => parser.parse());
+  }
+  compareSourceCorpus(grammar, [...cases.map(c => c[0]), '', 'ab::ab!!', 'ab\n:', 'ab?']);
+});
+
+test('generated shell numeric descriptors require immediate unquoted operator adjacency', async () => {
+  const grammar = await grammarFromEbnf(fs.readFileSync(path.resolve(__dirname, '../fixtures/shell.ebnf'), 'utf8'));
+  const module = { exports: {} };
+  vm.runInNewContext(new CodeGenerator(grammar).generate(), { module, structuredClone });
+  const cases = [
+    ['echo 255', '255', 'WORD', 5, 8],
+    ['echo 255 > out', '255', 'WORD', 5, 8],
+    ['echo 255\t>out', '255', 'WORD', 5, 8],
+    ['echo 255>out', '255', 'IO_NUMBER', 5, 8],
+    ['echo 12x>out', '12x', 'WORD', 5, 8],
+    ["echo '255'>out", "'255'", 'WORD', 5, 10],
+    ['echo \\2>out', '\\2', 'WORD', 5, 7],
+    ['echo 2>&1', '1', 'WORD', 8, 9],
+    ['cat < 123', '123', 'WORD', 6, 9],
+    ['echo 12>>34', '12', 'IO_NUMBER', 5, 7],
+    ['echo 12 >>34', '12', 'WORD', 5, 7],
+    ['echo 12 >>34', '34', 'WORD', 10, 12],
+  ];
+  for (const [input, value, type, start, end] of cases) {
+    const parser = new module.exports(input);
+    const token = parser.tokens.find(t => t.value === value);
+    assert.ok(token, input);
+    assert.deepEqual([token.type, token.start, token.end], [type, start, end], input);
+    assert.doesNotThrow(() => parser.parse());
+  }
+  compareSourceCorpus(grammar, [...cases.map(c => c[0]), 'echo 12\n', 'echo 2<in', 'echo 2 <123', 'echo "é 😄" 12 >out']);
+});
+
 test('C++98 shell lexer/parser consumes scripts directly and matches JavaScript tokens, trees and failures', async () => {
   const input = fs.readFileSync(path.resolve(__dirname, '../fixtures/shell.ebnf'), 'utf8');
   const grammar = await grammarFromEbnf(input);

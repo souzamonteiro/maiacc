@@ -279,6 +279,12 @@ class GrammarParser {
   parseContextExpression(expr) {
     const lexicalSequence = expr.LexicalSequence;
     const patterns = this.parseLexicalSequence(lexicalSequence);
+    // REx A & B consumes A only and requires B at its end position.
+    // LexicalItem here is a direct child, outside the consuming sequence.
+    if (expr.LexicalItem) {
+      const operand = this.parseLexicalItem(expr.LexicalItem);
+      if (operand) patterns.push({ type: 'lookahead', operand, quantifier: 'exactly1' });
+    }
     return patterns;
   }
   

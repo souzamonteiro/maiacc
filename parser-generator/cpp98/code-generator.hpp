@@ -176,6 +176,10 @@ static MaiaCCText maiaCCLexicalItem(MaiaCCGenerator* generator, MaiaCCItem* item
         }
     } else if (item->kind == MAIACC_GROUP) base = maiaCCLexicalChoices(generator, item->choices, visiting, 1);
     else if (item->kind == MAIACC_ANY) base = maiaCCText("[\\s\\S]");
+    else if (item->kind == MAIACC_LOOKAHEAD) {
+        maiaCCWrite(&output, "(?="); maiaCCWriteText(&output, maiaCCLexicalItem(generator, item->left, visiting)); maiaCCWrite(&output, ")");
+        base = maiaCCFinish(generator->arena, &output);
+    }
     else if (item->kind == MAIACC_DIFFERENCE) {
         MaiaCCItem* left = item->left; MaiaCCItem* right = item->right;
         if (left->kind == MAIACC_ANY && !left->quantifier && right->kind == MAIACC_LITERAL && !right->quantifier && maiaCCUtf16Length(right->value) == 1) {

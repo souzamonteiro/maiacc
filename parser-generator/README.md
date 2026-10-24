@@ -15,6 +15,11 @@ validation gate. The established JavaScript CLI is still the default.
 - Generates JavaScript lexer/parsers from EBNF-derived XML.
 - Generates C++98 lexer/parser functions and prefixed token-ID macros from the same grammar model.
 - Handles syntax and lexical rules (including groups and quantifiers).
+- Preserves REx positive lexical context (`A & B`): consume A only when B
+  matches immediately afterward. Both generators emit a zero-width positive
+  assertion for both target languages, including grouped/referenced and
+  quantified context items. For example, `IO_NUMBER ::= [0-9]+ & [<>]`
+  distinguishes an adjacent descriptor from a spaced numeric argument.
 - Supports skip tokens (for example, whitespace via `/* ws: definition */`).
 - Includes unit and integration tests.
 - Self-hosting milestone reached for the current REx grammar flow:

@@ -42,7 +42,8 @@ test('complete C++98 generator matches both backends and bootstraps without the 
     const fixtures = [rexGrammar, path.join(source, 'xml.ebnf'),
       path.join(root, 'parser-generator/examples/sample-grammar.ebnf'),
       path.join(root, 'parser-generator/examples/WAT.ebnf'),
-      path.join(root, 'parser-generator/tests/fixtures/shell.ebnf'), featureGrammar, unicodeGrammar];
+      path.join(root, 'parser-generator/tests/fixtures/shell.ebnf'),
+      path.join(root, 'parser-generator/tests/fixtures/lexical-context.ebnf'), featureGrammar, unicodeGrammar];
     for (const fixture of fixtures) {
       const xml = nativeXml(seed, fixture);
       const model = await new GrammarParser(xml).parse();

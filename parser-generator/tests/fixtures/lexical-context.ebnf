@@ -1,0 +1,9 @@
+Input ::= (Guarded | Loose | ':' | '!')* EOF
+<?TOKENS?>
+EOF ::= $
+Guarded ::= ('ab')+ & Boundary+
+          | 'xy' & '!'?
+Boundary ::= ':' | '!!'
+Loose ::= [a-z]+
+Space ::= [#x20#x9#xA]+ /* ws: definition */
+Guarded << Loose

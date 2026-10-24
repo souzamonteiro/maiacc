@@ -34,7 +34,7 @@ Word ::= WORD | IO_NUMBER | ASSIGNMENT_WORD
 <?TOKENS?>
 EOF ::= $
 NAME ::= [A-Za-z_] [A-Za-z0-9_]*
-IO_NUMBER ::= [0-9]+
+IO_NUMBER ::= [0-9]+ & [<>]
 ASSIGNMENT_WORD ::= NAME '=' WORD?
 WORD ::= (UnquotedChar | SingleQuoted | DoubleQuoted | EscapedChar)+
 UnquotedChar ::= [#x21] | [#x23-#x25] | [#x2A-#x3A] | [#x3D] | [#x3F-#x5B] | [#x5D-#x5F] | [#x61-#x7A] | [#x7E]

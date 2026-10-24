@@ -155,6 +155,8 @@ class CodeGenerator {
       } else if (groupAlternatives.length > 1) {
         base = `(?:${groupAlternatives.join('|')})`;
       }
+    } else if (item.type === 'lookahead') {
+      base = `(?=${this.lexicalItemToRegex(item.operand, visiting)})`;
     } else if (item.type === 'difference') {
       // Lexical difference (A - B)
       const lft = item.left;

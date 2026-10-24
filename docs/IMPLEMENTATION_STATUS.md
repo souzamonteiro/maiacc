@@ -1,5 +1,24 @@
 # Implementation Status — complete C++98 generator bootstrap
 
+## Positive lexical context correction — 2026-10-24
+
+Both grammar models now retain the direct context item of `A & B` as a typed
+positive assertion. Both emitters preserve it without consuming B. This fixes
+shell IO_NUMBER adjacency at its owner rather than adding handwritten scanning
+in the shell. Existing REx lexical contexts also survive regeneration of the
+versioned default parser (`npm run build`). Native generator tests include a
+context fixture and compare both target sources byte for byte; later native
+generations use no JavaScript emitter. Scanner regressions assert independently
+specified token types/spans for spaced/adjacent descriptors, quoting, escaped
+digits, numeric targets, context references, groups, quantifiers and fallback.
+
+Focused generator/scanner tests pass (13 tests). `npm test` after default-parser
+regeneration passes all 116 tests, including two complete native generations
+and both emitted languages. Downstream full WASM bootstrap remains a separate
+propagation gate.
+No CLI/grammar syntax, MaiaRegex API, release version or npm publication changes.
+The earlier dated bootstrap record below remains historical evidence.
+
 Verified: 2026-10-20. The complete native AND actual WASM generator bootstrap
 stage is implemented, tested and published. The stable default remains JS.
 

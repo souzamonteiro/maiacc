@@ -152,6 +152,16 @@ static MaiaCCSequence* maiaCCModelChoices(MaiaCCArena* arena, MaiaCCNode* choice
     for (MaiaCCNode* child = choice ? choice->first : 0; child; child = child->next) if (maiaCCTextIs(child->name, sequenceName)) {
         MaiaCCSequence* sequence = maiaCCModelSequence(arena, context ? maiaCCChild(child, "LexicalSequence") : child, lexical);
         if (!sequence) break;
+        MaiaCCNode* contextItem = context ? maiaCCChild(child, "LexicalItem") : 0;
+        if (contextItem) {
+            MaiaCCItem* assertion = (MaiaCCItem*)maiaCCAllocate(arena, sizeof(MaiaCCItem));
+            if (!assertion) break;
+            assertion->kind = MAIACC_LOOKAHEAD;
+            assertion->left = maiaCCModelItem(arena, contextItem, 1);
+            if (!assertion->left) { arena->failed = 1; break; }
+            if (sequence->last) sequence->last->next = assertion; else sequence->first = assertion;
+            sequence->last = assertion;
+        }
         if (last) last->next = sequence; else first = sequence;
         last = sequence;
     }
