@@ -131,9 +131,11 @@ class CodeGenerator {
     if (item.type === 'literal') {
       base = this.escapeRegex(item.value);
     } else if (item.type === 'tokenRef') {
-      // EOF is handled by the lexer automatically as the final token.
+      // The lexer adds its EOF token automatically, but references in lexical
+      // contexts still need a strict input-end assertion (JS $ also allows a
+      // match before a final newline).
       if (item.value === 'EOF') {
-        base = '';
+        base = '(?![\\s\\S])';
       } else {
         const refToken = this.grammar.tokens.get(item.value);
         base = refToken ? this.tokenPatternToRegexInternal(refToken, visiting) : '';

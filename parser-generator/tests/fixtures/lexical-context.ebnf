@@ -3,7 +3,10 @@ Input ::= (Guarded | Loose | ':' | '!')* EOF
 EOF ::= $
 Guarded ::= ('ab')+ & Boundary+
           | 'xy' & '!'?
+          | 'end' & End
+          | 'stop' & $
 Boundary ::= ':' | '!!'
+End ::= $
 Loose ::= [a-z]+
 Space ::= [#x20#x9#xA]+ /* ws: definition */
 Guarded << Loose

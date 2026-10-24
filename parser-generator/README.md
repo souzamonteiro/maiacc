@@ -20,6 +20,8 @@ validation gate. The established JavaScript CLI is still the default.
   assertion for both target languages, including grouped/referenced and
   quantified context items. For example, `IO_NUMBER ::= [0-9]+ & [<>]`
   distinguishes an adjacent descriptor from a spaced numeric argument.
+  `$` and EOF references within lexical patterns assert strict input end,
+  including after indirection; a final newline is still input to be consumed.
 - Supports skip tokens (for example, whitespace via `/* ws: definition */`).
 - Includes unit and integration tests.
 - Self-hosting milestone reached for the current REx grammar flow:

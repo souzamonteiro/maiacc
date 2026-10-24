@@ -168,7 +168,9 @@ static MaiaCCText maiaCCLexicalItem(MaiaCCGenerator* generator, MaiaCCItem* item
     MaiaCCText base = maiaCCText("");
     MaiaCCBuffer output; maiaCCBufferInit(&output);
     if (item->kind == MAIACC_LITERAL) base = maiaCCEscapePattern(generator, item->value, 0);
-    else if (item->kind == MAIACC_TOKEN_REF && !maiaCCTextIs(item->value, "EOF")) base = maiaCCTokenPattern(generator, maiaCCFindProduction(generator->grammar->tokens, item->value), visiting);
+    else if (item->kind == MAIACC_TOKEN_REF) {
+        base = maiaCCTextIs(item->value, "EOF") ? maiaCCText("(?![\\s\\S])") : maiaCCTokenPattern(generator, maiaCCFindProduction(generator->grammar->tokens, item->value), visiting);
+    }
     else if (item->kind == MAIACC_CHARCLASS) {
         if (!item->value.length) base = maiaCCText(item->negated ? "[\\s\\S]" : "");
         else {

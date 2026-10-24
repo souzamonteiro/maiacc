@@ -16,6 +16,10 @@ Focused generator/scanner tests pass (13 tests). `npm test` after default-parser
 regeneration passes all 116 tests, including two complete native generations
 and both emitted languages. Downstream full WASM bootstrap remains a separate
 propagation gate.
+The context regression also covers direct `$` and indirect EOF assertions.
+They use a strict input-end assertion rather than a JavaScript `$` anchor,
+which would incorrectly accept a position before a final newline. The new
+regression reproduced the former empty-EOF-reference failure before correction.
 No CLI/grammar syntax, MaiaRegex API, release version or npm publication changes.
 The earlier dated bootstrap record below remains historical evidence.
 

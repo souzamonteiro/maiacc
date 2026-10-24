@@ -240,6 +240,11 @@ test('REx lexical & context is a zero-width assertion with groups, references, q
     ['ab :', [['Loose', 'ab', 0, 2], ['TOKEN__3A_', ':', 3, 4]]],
     ['abxy:', [['Loose', 'abxy', 0, 4], ['TOKEN__3A_', ':', 4, 5]]],
     ['xy', [['Guarded', 'xy', 0, 2]]],
+    ['end', [['Guarded', 'end', 0, 3]]],
+    ['end!', [['Loose', 'end', 0, 3], ['TOKEN__21_', '!', 3, 4]]],
+    ['end\n', [['Loose', 'end', 0, 3]]],
+    ['stop', [['Guarded', 'stop', 0, 4]]],
+    ['stop\n', [['Loose', 'stop', 0, 4]]],
   ];
   for (const [input, expected] of cases) {
     const parser = new module.exports(input);
