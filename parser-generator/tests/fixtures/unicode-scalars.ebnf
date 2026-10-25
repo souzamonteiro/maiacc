@@ -1,0 +1,8 @@
+Input ::= (Literal | Range | Mixed | Negated | Raw)* EOF
+<?TOKENS?>
+Literal ::= #x10000
+Range ::= [#xE000-#x10FFFF]+
+Mixed ::= [a-z#x1F604]+
+Negated ::= [^#x10000-#x10FFFE]
+Raw ::= [😄-🙃]
+EOF ::= $

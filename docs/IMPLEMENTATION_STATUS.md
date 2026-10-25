@@ -1,5 +1,24 @@
 # Implementation Status — complete C++98 generator bootstrap
 
+## Supplementary Unicode correction — 2026-10-24
+
+Both JS and native C++98 models preserve #x literals/classes through U+10FFFF.
+Supplementary intervals become at most three UTF-16 surrogate rectangles per
+interval; mixed/negated classes retain whole-scalar matching. BMP-only classes
+keep their established emitted representation. Invalid/reversed numeric ranges
+fail rather than disappearing, and native failures preserve an existing output.
+The REx Char EBNF groups raw supplementary pairs before single units, preventing
+XML serialization of split surrogate halves. Regenerated rex-parser.js/XML.
+
+Validation: npm run build and npm test pass (117 tests, zero skipped/failed).
+Focused generator/scanner suite: 14 pass, including exact native/generated JS
+source parity, two native bootstrap generations, raw Unicode classes and
+independent boundary/acceptance/offset checks. Logs /tmp/maiacc-unicode-*.log.
+WASM generator execution and shell integration remain downstream propagation
+checks; this owner snapshot does not claim they have already passed.
+No versions/npm/history rewrite. User authorized owner publication and tested
+propagation; MaiaOS publication remains excluded.
+
 ## Positive lexical context correction — 2026-10-24
 
 Both grammar models now retain the direct context item of `A & B` as a typed

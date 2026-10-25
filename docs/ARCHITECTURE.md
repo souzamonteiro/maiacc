@@ -12,6 +12,15 @@ Handoff date: 2026-10-19. Runtime: strict C89. Compiler target: C++98.
 
 ## Parser And Regex Contracts
 
+- EBNF `#x` literals/classes support values through U+10FFFF. Supplementary
+  class intervals lower to bounded UTF-16 surrogate rectangles; negated classes
+  with supplementary members exclude whole scalars and consume whole pairs.
+  BMP-only classes keep their established source/runtime behavior. Reversed or
+  out-of-range numeric intervals fail generation instead of disappearing.
+- The generated REx `Char` token groups a valid surrogate pair before the
+  single-unit alternative, so raw supplementary class members survive XML
+  serialization. No handwritten lexer is involved.
+
 - EBNF is authoritative. Generate parsers and lexers exclusively through MaiaCC/tREx; never patch generated files or replace them with handwritten scanners.
 - The MaiaCC pattern compiler constructs continuation-linked graphs directly, with Thompson-like ordered SPLIT branches; it does not determinize them.
 - MaiaRegex matches UTF-16 units at an explicit start offset. END is absolute buffer end, not multiline matching. Branch priority is ordered, not POSIX longest-alternative selection.

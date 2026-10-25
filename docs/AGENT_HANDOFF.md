@@ -1,5 +1,17 @@
 # MaiaCC C++98 handoff — stage complete
 
+## Unicode owner correction — 2026-10-24
+
+Explicit user approval covers supplementary Unicode fixes/publication in the
+principal MaiaCC and tested protocol propagation, then unquoted shell UTF-8;
+no npm, versions, history rewriting or MaiaOS commit/push. Owner code lives only
+here, not in nested consumers. See IMPLEMENTATION_STATUS.md and ARCHITECTURE.md.
+Default parser regenerated from REx EBNF. npm test:117 pass; focused14 pass.
+New fixture tests/fixtures/unicode-scalars.ebnf must join the downstream complete
+MaiaCC WASM bootstrap corpus. Publish this owner first, then MaiaWASM, MaiaC,
+MaiaCpp, MaiaJS, MaiaGlob and local MaiaOS pins using each local submodule.
+The current owner validation is native/JS, not yet downstream WASM confirmation.
+
 ## Authorized local snapshot — 2026-10-20
 
 The owner explicitly requested committing all pending MaiaCC and MaiaOS files.

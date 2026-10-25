@@ -171,6 +171,7 @@ static MaiaCCText maiaCCLexicalItem(MaiaCCGenerator* generator, MaiaCCItem* item
     else if (item->kind == MAIACC_TOKEN_REF) {
         base = maiaCCTextIs(item->value, "EOF") ? maiaCCText("(?![\\s\\S])") : maiaCCTokenPattern(generator, maiaCCFindProduction(generator->grammar->tokens, item->value), visiting);
     }
+    else if (item->kind == MAIACC_UNICODE_CLASS) base = item->value;
     else if (item->kind == MAIACC_CHARCLASS) {
         if (!item->value.length) base = maiaCCText(item->negated ? "[\\s\\S]" : "");
         else {

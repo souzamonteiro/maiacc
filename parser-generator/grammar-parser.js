@@ -360,7 +360,8 @@ class GrammarParser {
     // CharClass
     if (primary.CharClass) {
       const parsed = this.parseCharClass(primary.CharClass);
-      return { type: 'charclass', value: parsed.content, negated: parsed.negated };
+      return parsed.pattern ? { type: 'unicodeClass', value: parsed.pattern }
+        : { type: 'charclass', value: parsed.content, negated: parsed.negated };
     }
     
     // CharCode
@@ -421,6 +422,48 @@ class GrammarParser {
     const tokenElements = toArray(charClass.TOKEN);
     const negated = tokenElements.includes('[^');
 
+    // Keep legacy BMP source stable; supplementary members need UTF-16 pairs.
+    const intervals = [];
+    for (const raw of toArray(charClass.CharRange)) {
+      const points = Array.from(raw);
+      intervals.push([points[0].codePointAt(0), points[2].codePointAt(0)]);
+    }
+    for (const raw of toArray(charClass.Char)) intervals.push([raw.codePointAt(0), raw.codePointAt(0)]);
+    for (const raw of toArray(charClass.CharCode)) {
+      const point = this.parseCharCode(raw).codePointAt(0); intervals.push([point, point]);
+    }
+    for (const raw of toArray(charClass.CharCodeRange)) {
+      const match = String(raw).match(/^#x([0-9a-fA-F]+)-#x([0-9a-fA-F]+)$/);
+      if (!match) throw new Error('Invalid Unicode range: ' + raw);
+      intervals.push([parseInt(match[1], 16), parseInt(match[2], 16)]);
+    }
+    for (const [first, last] of intervals) {
+      if (first > last || last > 0x10ffff || !Number.isFinite(last)) throw new Error('Invalid Unicode range');
+    }
+    if (intervals.some(([, last]) => last > 0xffff)) {
+      const escape = value => '\\u' + value.toString(16).padStart(4, '0');
+      const unit = (first, last) => '[' + escape(first) + (first === last ? '' : '-' + escape(last)) + ']';
+      const parts = [];
+      const pair = (highFirst, highLast, lowFirst, lowLast) => parts.push(unit(highFirst, highLast) + unit(lowFirst, lowLast));
+      for (let [first, last] of intervals) {
+        if (first <= 0xffff) parts.push(unit(first, Math.min(last, 0xffff)));
+        if (last <= 0xffff) continue;
+        first = Math.max(first, 0x10000) - 0x10000; last -= 0x10000;
+        const highFirst = 0xd800 + (first >> 10), highLast = 0xd800 + (last >> 10);
+        const lowFirst = 0xdc00 + (first & 1023), lowLast = 0xdc00 + (last & 1023);
+        if (highFirst === highLast) pair(highFirst, highLast, lowFirst, lowLast);
+        else {
+          pair(highFirst, highFirst, lowFirst, 0xdfff);
+          if (highFirst + 1 < highLast) pair(highFirst + 1, highLast - 1, 0xdc00, 0xdfff);
+          pair(highLast, highLast, 0xdc00, lowLast);
+        }
+      }
+      const positive = '(?:' + parts.join('|') + ')';
+      // Consume a full scalar after the exclusion assertion, never half a pair.
+      const scalar = '(?:[\\ud800-\\udbff][\\udc00-\\udfff]|[\\u0000-\\ud7ff\\ue000-\\uffff])';
+      return {pattern: negated ? '(?!' + positive + ')' + scalar : positive};
+    }
+
     // Extract char class content
     let content = '';
 
@@ -445,15 +488,13 @@ class GrammarParser {
 
   parseCharCodeRange(rangeStr) {
     const m = String(rangeStr).match(/^#x([0-9a-fA-F]+)-#x([0-9a-fA-F]+)$/);
-    if (!m) return '';
+    if (!m) throw new Error('Invalid Unicode range: ' + rangeStr);
 
     const start = parseInt(m[1], 16);
     const end = parseInt(m[2], 16);
 
-    // Without /u flag in the current generator, keep it in BMP for safety
-    if (start > 0xFFFF || end > 0xFFFF) {
-      return '';
-    }
+    if (start > end || end > 0x10ffff) throw new Error('Invalid Unicode range: ' + rangeStr);
+    if (end > 0xffff) throw new Error('Supplementary range requires class lowering');
 
     const startEscape = `\\u${start.toString(16).padStart(4, '0')}`;
     const endEscape = `\\u${end.toString(16).padStart(4, '0')}`;
@@ -466,9 +507,7 @@ class GrammarParser {
     const match = codeStr.match(/#x([0-9a-fA-F]+)/);
     if (match) {
       const codePoint = parseInt(match[1], 16);
-      if (codePoint > 0xFFFF) {
-        return '';
-      }
+      if (!Number.isFinite(codePoint) || codePoint > 0x10ffff) throw new Error('Invalid Unicode code point: ' + codeStr);
       return String.fromCodePoint(codePoint);
     }
     return codeStr;

@@ -402,3 +402,32 @@ int main() {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
 });
+
+test('supplementary EBNF literals/classes lower to whole UTF-16 pairs with exact raw-input parity', async () => {
+  const fixtures = [
+    ['#x10000', ['\u{10000}'], ['a','\uffff','\u{10001}']],
+    ['#x10FFFF', ['\u{10ffff}'], ['\u{10fffe}']],
+    ['[#xE000-#x10FFFF]+', ['\ue000','\uffff','\u{10000}','😄','\u{10ffff}'], ['a','\ud7ff']],
+    ['[#x103FF-#x10801]+', ['\u{103ff}','\u{10400}','\u{107ff}','\u{10801}'], ['\u{103fe}','\u{10802}']],
+    ['[a-z#x1F600-#x1F603]+', ['abc😀😃','😂'], ['😄','A']],
+    ['[^#x10000-#x10FFFE]+', ['abc\n','\uffff','\u{10ffff}'], ['😄','\u{10000}','\u{10fffe}']],
+    ['[😄-🙃]+', ['😄','🙃'], ['😃','🙄']],
+    ['[#x1F604]+', ['😄😄'], ['😃','😅']],
+    ['[^a#x1F604]+', ['b😃😅','\u{10ffff}'], ['a','😄']],
+  ];
+  for (const [pattern, yes, no] of fixtures) {
+    const grammar = await grammarFromEbnf('Input ::= Value EOF\n<?TOKENS?>\nValue ::= '+pattern+'\nEOF ::= $\n');
+    const module = {exports:{}};
+    vm.runInNewContext(new CodeGenerator(grammar).generate(), {module,structuredClone});
+    for (const input of yes) {
+      const parser = new module.exports(input); assert.doesNotThrow(()=>parser.parse(),pattern+': '+input);
+      assert.equal(parser.tokens[0].start,0);assert.equal(parser.tokens[0].end,input.length);
+      assert.equal(parser.tokens[0].value,input);
+    }
+    for (const input of no) assert.throws(()=>new module.exports(input).parse(),undefined,pattern+': reject '+input);
+    compareSourceCorpus(grammar,[...yes,...no,'','😄a','a😄']);
+  }
+  for (const pattern of ['#x110000','[#x110000]','[#x10000-#x110000]','[#x10001-#x10000]']) {
+    await assert.rejects(()=>grammarFromEbnf('Input ::= Value EOF\n<?TOKENS?>\nValue ::= '+pattern+'\nEOF ::= $\n'),/Invalid Unicode/);
+  }
+});

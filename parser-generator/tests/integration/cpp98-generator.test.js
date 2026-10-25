@@ -39,7 +39,8 @@ test('complete C++98 generator matches both backends and bootstraps without the 
     const unicodeGrammar = path.join(temporary, 'unicode.ebnf');
     fs.writeFileSync(unicodeGrammar, 'RegraÁ ::= "😀" Letras? (Exclusion | NullUnit)* EOF\n<?TOKENS?>\n' +
       'Letras ::= [#xC0-#xD6a-z]+\nExclusion ::= . - ("x" | "y")\nNullUnit ::= #x0\nEOF ::= $\n');
-    const fixtures = [rexGrammar, path.join(source, 'xml.ebnf'),
+    const scalarGrammar = path.join(root,'parser-generator/tests/fixtures/unicode-scalars.ebnf');
+    const fixtures = [scalarGrammar, rexGrammar, path.join(source, 'xml.ebnf'),
       path.join(root, 'parser-generator/examples/sample-grammar.ebnf'),
       path.join(root, 'parser-generator/examples/WAT.ebnf'),
       path.join(root, 'parser-generator/tests/fixtures/shell.ebnf'),
@@ -76,6 +77,22 @@ test('complete C++98 generator matches both backends and bootstraps without the 
       }
       assert.equal(nativeXml(directory, rexGrammar), nativeXml(previous, rexGrammar));
       previous = directory;
+    }
+    // Both native bootstrap generations retain the Unicode class model.
+    for (const language of ['cpp98','javascript']) {
+      const xml = nativeXml(previous, scalarGrammar);
+      const model = await new GrammarParser(xml).parse();
+      assert.equal(nativeGenerate(previous, xml, language, path.join(temporary,'scalar.'+language)),
+        new CodeGenerator(model,{language}).generate());
+    }
+    for (const pattern of ['#x110000','[#x110000]','[#x10000-#x110000]','[#x10001-#x10000]']) {
+      const file = path.join(temporary,'invalid-unicode.ebnf');
+      fs.writeFileSync(file,'Input ::= Value EOF\n<?TOKENS?>\nValue ::= '+pattern+'\nEOF ::= $\n');
+      const xml = nativeXml(previous,file), input = path.join(temporary,'invalid-unicode.xml');
+      fs.writeFileSync(input,xml);
+      const output = path.join(temporary,'unicode-protected.cpp');fs.writeFileSync(output,'KEEP');
+      const result = spawnSync(path.join(previous,'MaiaCC-cpp98'),[input,output],{encoding:'utf8',timeout:30000});
+      assert.notEqual(result.status,0,pattern);assert.equal(fs.readFileSync(output,'utf8'),'KEEP');
     }
     // Generated JavaScript is also executable, not only source-comparable.
     const sample = path.join(root, 'parser-generator/examples/sample-grammar.ebnf');

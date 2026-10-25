@@ -140,6 +140,8 @@ class CodeGenerator {
         const refToken = this.grammar.tokens.get(item.value);
         base = refToken ? this.tokenPatternToRegexInternal(refToken, visiting) : '';
       }
+    } else if (item.type === 'unicodeClass') {
+      base = item.value;
     } else if (item.type === 'charclass') {
       if (!item.value) {
         // Empty class: avoid generating [] (invalid regex)

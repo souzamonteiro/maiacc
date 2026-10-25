@@ -9,6 +9,11 @@ the frontend, grammar model and both emitters, with stable complete native
 bootstrap generations. Use `bin/tREx-cpp98.sh` after its explicit bootstrap build.
 Full generator execution through MaiaCpp/MaiaC to WASM is a separate validation gate.
 
+Both generators retain Unicode `#x` literals and character-class ranges through
+U+10FFFF, including supplementary characters and mixed/negated classes. They
+lower them to the existing UTF-16 regex contract without changing token offsets;
+invalid numeric ranges fail explicitly. See [architecture contracts](docs/ARCHITECTURE.md).
+
 ## Process Documentation
 
 Mandatory cross-repository synchronization workflow:

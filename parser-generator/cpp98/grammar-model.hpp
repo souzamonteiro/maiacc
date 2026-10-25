@@ -1,6 +1,7 @@
 #ifndef MAIACC_CPP98_GRAMMAR_MODEL_HPP
 #define MAIACC_CPP98_GRAMMAR_MODEL_HPP
 #include "model.hpp"
+#include "regex-compiler.hpp"
 
 static MaiaCCText maiaCCUnquote(MaiaCCText text)
 {
@@ -50,7 +51,8 @@ static MaiaCCText maiaCCCharCode(MaiaCCArena* arena, MaiaCCText text)
     cursor += 2;
     unsigned int value = maiaCCParseHex(text, &cursor);
     MaiaCCBuffer buffer; maiaCCBufferInit(&buffer);
-    if (value <= 65535) maiaCCWriteCodePoint(&buffer, value);
+    if (value <= 1114111) maiaCCWriteCodePoint(&buffer, value);
+    else arena->failed = 1;
     return maiaCCFinish(arena, &buffer);
 }
 static void maiaCCUnicodeEscape(MaiaCCBuffer* buffer, unsigned int value)
@@ -68,8 +70,60 @@ static void maiaCCCharCodeRange(MaiaCCBuffer* buffer, MaiaCCText text)
     if (cursor + 3 >= text.length || text.data[cursor] != '-' || text.data[cursor + 1] != '#' || text.data[cursor + 2] != 'x') return;
     cursor += 3;
     unsigned int last = maiaCCParseHex(text, &cursor);
-    if (cursor != text.length || first > 65535 || last > 65535) return;
+    if (cursor != text.length || first > last || last > 65535) { buffer->failed = 1; return; }
     maiaCCUnicodeEscape(buffer, first); maiaCCWrite(buffer, "-"); maiaCCUnicodeEscape(buffer, last);
+}
+
+/* Lower scalar intervals into the existing UTF-16 regex instruction contract.
+ * Broad supplementary ranges need at most three surrogate rectangles. */
+static void maiaCCUnicodeUnit(MaiaCCBuffer* output, unsigned int first, unsigned int last)
+{
+    maiaCCWrite(output, "["); maiaCCUnicodeEscape(output, first);
+    if (first != last) { maiaCCWrite(output, "-"); maiaCCUnicodeEscape(output, last); }
+    maiaCCWrite(output, "]");
+}
+static void maiaCCUnicodePair(MaiaCCBuffer* output, unsigned int first, unsigned int last,
+    unsigned int lowFirst, unsigned int lowLast, unsigned int* count)
+{
+    if ((*count)++) maiaCCWrite(output, "|");
+    maiaCCUnicodeUnit(output, first, last); maiaCCUnicodeUnit(output, lowFirst, lowLast);
+}
+static void maiaCCUnicodeInterval(MaiaCCBuffer* output, unsigned int first, unsigned int last, unsigned int* count)
+{
+    if (first <= 65535) {
+        if ((*count)++) maiaCCWrite(output, "|");
+        maiaCCUnicodeUnit(output, first, last < 65535 ? last : 65535);
+    }
+    if (last <= 65535) return;
+    first = (first < 65536 ? 65536 : first) - 65536; last -= 65536;
+    unsigned int highFirst = 55296 + (first >> 10), highLast = 55296 + (last >> 10);
+    unsigned int lowFirst = 56320 + (first & 1023), lowLast = 56320 + (last & 1023);
+    if (highFirst == highLast) maiaCCUnicodePair(output, highFirst, highLast, lowFirst, lowLast, count);
+    else {
+        maiaCCUnicodePair(output, highFirst, highFirst, lowFirst, 57343, count);
+        if (highFirst + 1 < highLast) maiaCCUnicodePair(output, highFirst + 1, highLast - 1, 56320, 57343, count);
+        maiaCCUnicodePair(output, highLast, highLast, 56320, lowLast, count);
+    }
+}
+static MaiaCCText maiaCCUnicodeClass(MaiaCCArena* arena, MaiaCCNode* node, int negated, int* supplementary)
+{
+    MaiaCCBuffer output; maiaCCBufferInit(&output);
+    maiaCCWrite(&output, negated ? "(?!(?:" : "(?:");
+    unsigned int count = 0;
+    const char* kinds[4]; kinds[0] = "CharRange"; kinds[1] = "Char"; kinds[2] = "CharCode"; kinds[3] = "CharCodeRange";
+    for (unsigned int kind = 0; kind < 4; ++kind) for (MaiaCCNode* child = node->first; child; child = child->next) if (maiaCCTextIs(child->name, kinds[kind])) {
+        MaiaCCText text = child->value; size_t cursor = kind >= 2 ? 2 : 0;
+        unsigned int first = kind >= 2 ? maiaCCParseHex(text, &cursor) : maiaCCReadCodePoint(text, &cursor);
+        unsigned int last = first;
+        if (kind == 0) { ++cursor; last = maiaCCReadCodePoint(text, &cursor); }
+        if (kind == 3) { cursor += 3; last = maiaCCParseHex(text, &cursor); }
+        if (first > last || last > 1114111 || cursor != text.length) { arena->failed = 1; break; }
+        if (last > 65535) *supplementary = 1;
+        maiaCCUnicodeInterval(&output, first, last, &count);
+    }
+    maiaCCWrite(&output, ")");
+    if (negated) maiaCCWrite(&output, ")(?:[\\ud800-\\udbff][\\udc00-\\udfff]|[\\u0000-\\ud7ff\\ue000-\\uffff])");
+    return maiaCCFinish(arena, &output);
 }
 
 static MaiaCCSequence* maiaCCModelChoices(MaiaCCArena* arena, MaiaCCNode* choice, int lexical, int context);
@@ -99,6 +153,9 @@ static MaiaCCItem* maiaCCModelItem(MaiaCCArena* arena, MaiaCCNode* node, int lex
             item->kind = MAIACC_CHARCLASS;
             MaiaCCBuffer buffer; maiaCCBufferInit(&buffer);
             for (MaiaCCNode* child = charClass->first; child; child = child->next) if (maiaCCTextIs(child->name, "TOKEN") && maiaCCTextIs(child->value, "[^")) item->negated = 1;
+            int supplementary = 0;
+            MaiaCCText unicode = maiaCCUnicodeClass(arena, charClass, item->negated, &supplementary);
+            if (supplementary) { item->kind = MAIACC_UNICODE_CLASS; item->value = unicode; return item; }
             /* xml2js groups equal child names; retain the reference's group order. */
             const char* kinds[4]; kinds[0] = "CharRange"; kinds[1] = "Char"; kinds[2] = "CharCode"; kinds[3] = "CharCodeRange";
             for (unsigned int kind = 0; kind < 4; ++kind) for (MaiaCCNode* child = charClass->first; child; child = child->next) if (maiaCCTextIs(child->name, kinds[kind])) {

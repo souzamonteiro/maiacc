@@ -96,7 +96,8 @@ StringLiteral
 CaretName
          ::= '^' Name?
 CharCode ::= '#x' [0-9a-fA-F]+
-Char     ::= [^#x9#xA#xD#x23#x5D]
+Char     ::= [#xD800-#xDBFF] [#xDC00-#xDFFF]
+           | [^#x9#xA#xD#x23#x5D]
            | '#' &[^0-9a-fA-F]
 CharRange
          ::= Char '-' Char
