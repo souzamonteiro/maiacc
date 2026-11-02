@@ -14,6 +14,9 @@ U+10FFFF, including supplementary characters and mixed/negated classes. They
 lower them to the existing UTF-16 regex contract without changing token offsets;
 invalid numeric ranges fail explicitly. See [architecture contracts](docs/ARCHITECTURE.md).
 
+Generated C++98 parsers expose a separate allocation/overflow status while
+preserving boolean syntax failure. See [parser resource status](docs/CPP98_PARSER_RESOURCES.md).
+
 ## Process Documentation
 
 Mandatory cross-repository synchronization workflow:

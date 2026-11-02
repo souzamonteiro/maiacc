@@ -1,3 +1,15 @@
+# Approved BRE prerequisite — 2026-11-02
+
+Owner explicitly authorized fixing generated-parser allocation/overflow signaling,
+publication and tested protocol propagation through the MaiaRegex bootstrap.
+See CPP98_PARSER_RESOURCES.md. Boolean failed is preserved; new resourceError
+separates NONE/NOMEM/LIMIT. Template assets are regenerated from their owner JS
+source. Full npm test:118 pass, no failures/skips; focused fixture strengthened
+to32 native C++98/ASan/UBSan checks. Native bootstrap0/1/2 and both-language emitter
+parity pass. Own-chain fixture execution belongs to downstream MaiaCpp after
+published local-pin consumption; do not claim it from owner native evidence.
+No npm/version/history or MaiaOS/MaiaRegex commit/push authorization is included.
+
 # MaiaCC C++98 handoff — stage complete
 
 ## Unicode owner correction — 2026-10-24
