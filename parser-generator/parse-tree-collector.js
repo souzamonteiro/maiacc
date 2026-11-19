@@ -2,6 +2,7 @@ class ParseTreeCollector {
   constructor() {
     this.stack = [];
     this.root = null;
+    this.lastClosedNode = null;
   }
 
   parse(parser, inputLabel = 'input') {
@@ -30,16 +31,26 @@ class ParseTreeCollector {
   }
 
   checkpoint() {
+    const len = this.stack.length;
     return {
-      stack: structuredClone(this.stack),
-      root: structuredClone(this.root)
+      stackLength: len,
+      topChildCount: len > 0 ? this.stack[len - 1].children.length : 0,
+      root: this.root
     };
   }
 
   restore(mark) {
     if (!mark) return;
-    this.stack = mark.stack;
-    this.root = mark.root;
+    while (this.stack.length > mark.stackLength) {
+      this.stack.pop();
+    }
+    if (mark.stackLength > 0) {
+      const top = this.stack[mark.stackLength - 1];
+      if (top && top.children.length > mark.topChildCount) {
+        top.children.length = mark.topChildCount;
+      }
+    }
+    this.root = mark.root || null;
   }
 
   startNonterminal(name) {
@@ -59,7 +70,18 @@ class ParseTreeCollector {
   endNonterminal() {
     const node = this.stack.pop();
     if (!node) return;
+    this.lastClosedNode = node;
 
+    if (this.stack.length === 0) {
+      this.root = node;
+    } else {
+      this.stack[this.stack.length - 1].children.push(node);
+    }
+  }
+
+  appendNode(node) {
+    if (!node) return;
+    this.lastClosedNode = node;
     if (this.stack.length === 0) {
       this.root = node;
     } else {

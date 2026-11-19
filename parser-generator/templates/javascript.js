@@ -222,7 +222,9 @@ module.exports = {
 }`,
   
   // Parser header
-  parserHeader: `class Parser {
+  parserHeader: `const __BACKTRACK_ERROR = new Error('Backtrack');
+
+class Parser {
   constructor(input, eventHandler = null) {
     this.lexer = new Lexer(input);
     this.tokens = this.lexer.tokenize();
@@ -230,6 +232,8 @@ module.exports = {
     this.errors = [];
     this.eventHandler = eventHandler;
     this.failureMemo = new Set();
+    this.successMemo = new Map();
+    this._canMemoSuccess = !eventHandler || typeof eventHandler.appendNode === 'function';
   }
   
   peek(offset = 0) {
@@ -239,12 +243,15 @@ module.exports = {
   consume(expectedType) {
     const token = this.peek();
     if (!token || token.type !== expectedType) {
-      this.errors.push({
-        expected: expectedType,
-        found: token ? token.type : 'EOF',
-        position: this.position
-      });
-      throw new Error(\`Expected '\${expectedType}', got '\${token ? token.type : 'EOF'}'\`);
+      if (this.errors.length === 0 || this.position >= this.errors[this.errors.length - 1].position) {
+        this.errors.length = 0;
+        this.errors.push({
+          expected: expectedType,
+          found: token ? token.type : 'EOF',
+          position: this.position
+        });
+      }
+      throw __BACKTRACK_ERROR;
     }
     if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
       this.eventHandler.terminal(expectedType, token.value, this.position);
@@ -274,12 +281,15 @@ module.exports = {
     const pattern = this.lexer.tokenPatterns.find((candidate) => candidate.type === expectedType);
     const match = pattern && token ? token.value.match(pattern.regex) : null;
     if (!match || match.index !== 0 || match[0].length !== token.value.length) {
-      this.errors.push({
-        expected: expectedType,
-        found: token ? token.type : 'EOF',
-        position: this.position
-      });
-      throw new Error('Expected contextual ' + expectedType + ', got ' + (token ? token.type : 'EOF'));
+      if (this.errors.length === 0 || this.position >= this.errors[this.errors.length - 1].position) {
+        this.errors.length = 0;
+        this.errors.push({
+          expected: expectedType,
+          found: token ? token.type : 'EOF',
+          position: this.position
+        });
+      }
+      throw __BACKTRACK_ERROR;
     }
 
     if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
@@ -311,7 +321,23 @@ module.exports = {
   // Entry parse method
   startRule: `
   parse() {
-    const result = this.parse{{startRule}}();
+    const prevStackTraceLimit = Error.stackTraceLimit;
+    Error.stackTraceLimit = 0;
+    let result;
+    let parseErr = null;
+    try {
+      result = this.parse{{startRule}}();
+    } catch (e) {
+      parseErr = e;
+    } finally {
+      Error.stackTraceLimit = prevStackTraceLimit;
+    }
+    if (parseErr !== null) {
+      if (parseErr === __BACKTRACK_ERROR) {
+        throw new Error(this.getErrorMessage());
+      }
+      throw parseErr;
+    }
     const next = this.peek();
     if (!next && this.position === this.tokens.length) {
       return result;
@@ -328,7 +354,17 @@ module.exports = {
     const __memoStart = this.position;
     const __memoKey = '{{ruleName}}@' + __memoStart;
     if (this.failureMemo.has(__memoKey)) {
-      throw new Error('Previously failed rule {{ruleName}} at position ' + __memoStart);
+      throw __BACKTRACK_ERROR;
+    }
+    if (this._canMemoSuccess) {
+      const __memoHit = this.successMemo.get(__memoKey);
+      if (__memoHit !== undefined) {
+        this.position = __memoHit.endPos;
+        if (this.eventHandler && __memoHit.node) {
+          this.eventHandler.appendNode(__memoHit.node);
+        }
+        return;
+      }
     }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('{{ruleName}}', this.position);
@@ -339,6 +375,9 @@ module.exports = {
       __ok = true;
     } finally {
       if (!__ok) {
+        if (this.failureMemo.size > 200000) {
+          this.failureMemo.clear();
+        }
         this.failureMemo.add(__memoKey);
       }
       if (this.eventHandler) {
@@ -348,6 +387,15 @@ module.exports = {
         if (!__ok && typeof this.eventHandler.abortNonterminal === 'function') {
           this.eventHandler.abortNonterminal('{{ruleName}}', this.position);
         }
+      }
+      if (__ok && this._canMemoSuccess) {
+        if (this.successMemo.size > 200000) {
+          this.successMemo.clear();
+        }
+        this.successMemo.set(__memoKey, {
+          endPos: this.position,
+          node: this.eventHandler ? this.eventHandler.lastClosedNode : null
+        });
       }
     }
   }`,
@@ -364,7 +412,7 @@ module.exports = {
     }{{#unless @last}} else {{/unless}}
     {{/each}}
     else {
-      throw new Error(\`Expected one of: {{expected}}\`);
+      throw __BACKTRACK_ERROR;
     }`,
   
   // Consume token
@@ -405,7 +453,7 @@ module.exports = {
     }
 `,
   alternativesFailure: `    if (!_matched) {
-      throw new Error(\`Expected one of: {{count}} alternatives\`);
+      throw __BACKTRACK_ERROR;
     }
 `,
 
@@ -499,7 +547,7 @@ module.exports = {
       }
     }
     if (count === 0) {
-      throw new Error('Expected at least one {{name}}');
+      throw __BACKTRACK_ERROR;
     }
 `,
   nonterminalDefault: `    this.parse{{name}}();
@@ -519,7 +567,7 @@ module.exports = {
         }
       }
 `,
-  groupAlternativesFailure: `      if (!_matchedAlt) { throw new Error('No group alternative matched'); }
+  groupAlternativesFailure: `      if (!_matchedAlt) { throw __BACKTRACK_ERROR; }
 `,
   groupZeroOrMore: `    // Group *
     while (true) {
@@ -549,7 +597,7 @@ module.exports = {
         if (this.position === _loopStart) break;
         _count++;
       }
-      if (_count === 0) throw new Error('Expected at least one group match');
+      if (_count === 0) throw __BACKTRACK_ERROR;
     }
 `,
   groupOptional: `    // Group ?
