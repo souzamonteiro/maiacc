@@ -318,7 +318,8 @@ class Parser {
     }
     if (parseErr !== null) {
       if (parseErr === __BACKTRACK_ERROR) {
-        throw new Error(this.getErrorMessage());
+        const err = this.errors[this.errors.length - 1];
+        throw new Error(err ? `Expected '${err.expected}', got '${err.found}'` : this.getErrorMessage());
       }
       throw parseErr;
     }
