@@ -217,6 +217,7 @@ class Parser {
     this.tokens = this.lexer.tokenize();
     this.position = 0;
     this.errors = [];
+    this._lastError = null;
     this.eventHandler = eventHandler;
     this.failureMemo = new Set();
     this.successMemo = new Map();
@@ -230,13 +231,15 @@ class Parser {
   consume(expectedType) {
     const token = this.peek();
     if (!token || token.type !== expectedType) {
+      const errObj = {
+        expected: expectedType,
+        found: token ? token.type : 'EOF',
+        position: this.position
+      };
+      this._lastError = errObj;
       if (this.errors.length === 0 || this.position >= this.errors[this.errors.length - 1].position) {
         this.errors.length = 0;
-        this.errors.push({
-          expected: expectedType,
-          found: token ? token.type : 'EOF',
-          position: this.position
-        });
+        this.errors.push(errObj);
       }
       throw __BACKTRACK_ERROR;
     }
@@ -268,13 +271,15 @@ class Parser {
     const pattern = this.lexer.tokenPatterns.find((candidate) => candidate.type === expectedType);
     const match = pattern && token ? token.value.match(pattern.regex) : null;
     if (!match || match.index !== 0 || match[0].length !== token.value.length) {
+      const errObj = {
+        expected: expectedType,
+        found: token ? token.type : 'EOF',
+        position: this.position
+      };
+      this._lastError = errObj;
       if (this.errors.length === 0 || this.position >= this.errors[this.errors.length - 1].position) {
         this.errors.length = 0;
-        this.errors.push({
-          expected: expectedType,
-          found: token ? token.type : 'EOF',
-          position: this.position
-        });
+        this.errors.push(errObj);
       }
       throw __BACKTRACK_ERROR;
     }
@@ -318,7 +323,7 @@ class Parser {
     }
     if (parseErr !== null) {
       if (parseErr === __BACKTRACK_ERROR) {
-        const err = this.errors[this.errors.length - 1];
+        const err = this._lastError || this.errors[this.errors.length - 1];
         throw new Error(err ? `Expected '${err.expected}', got '${err.found}'` : this.getErrorMessage());
       }
       throw parseErr;
