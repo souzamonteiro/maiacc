@@ -614,7 +614,7 @@ class CodeGenerator {
             exactly1: templates.lexicalDefault
           };
 
-      switch (item.quantifier) {
+    switch (item.quantifier) {
         case 'optional':
           return this.renderTemplate(fragments.optional, { token: this.mapTokenName(item.value) });
         case 'zeroOrMore':
@@ -624,6 +624,15 @@ class CodeGenerator {
         default:
           return this.renderTemplate(fragments.exactly1, { token: this.mapTokenName(item.value), fail });
       }
+    }
+
+    // Undefined nonterminal rule (e.g. optional grammar placeholder like shebang?):
+    // avoid emitting a call to a non-existent this.parse<name>() method.
+    if (!this.grammar.rules.has(item.value)) {
+      if (item.quantifier === 'optional' || item.quantifier === 'zeroOrMore') {
+        return `    /* undefined nonterminal '${item.value}' (${item.quantifier}) */\n`;
+      }
+      return `    ${fail}\n`;
     }
 
     switch (item.quantifier) {
