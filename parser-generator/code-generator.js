@@ -483,7 +483,17 @@ class CodeGenerator {
     return code;
   }
   
+  nextBoolVar() {
+    this._boolVarId = (this._boolVarId || 0) + 1;
+    return `_ok_${this._boolVarId}`;
+  }
+
+  failAction(okVar) {
+    return okVar ? `${okVar} = false;` : 'return false;';
+  }
+
   generateRuleFunction(rule) {
+    this._boolVarId = 0;
     const templates = this.templates;
     const body = this.generateRuleBody(rule);
     
@@ -502,7 +512,7 @@ class CodeGenerator {
     }
     
     if (rule.sequences.length === 1) {
-      return this.generateSequence(rule.sequences[0]);
+      return this.generateSequence(rule.sequences[0], null);
     }
 
     // Multiple alternatives with backtracking (no early return)
@@ -517,44 +527,60 @@ class CodeGenerator {
 
     for (let i = 0; i < orderedSequences.length; i++) {
       const seq = orderedSequences[i];
-      alternatives += this.renderTemplate(templates.alternativeTryBlock, {
-        sequence: this.generateSequence(seq)
-      });
+      if (templates.booleanBacktracking) {
+        const altOk = this.nextBoolVar();
+        alternatives += this.renderTemplate(templates.alternativeTryBlock, {
+          okVar: altOk,
+          sequence: this.generateSequence(seq, altOk)
+        });
+      } else {
+        alternatives += this.renderTemplate(templates.alternativeTryBlock, {
+          sequence: this.generateSequence(seq)
+        });
+      }
     }
 
     alternatives += this.renderTemplate(templates.alternativesFailure, {
-      count: String(rule.sequences.length)
+      count: String(rule.sequences.length),
+      fail: this.failAction(null)
     });
 
     return alternatives;
   }
   
-  generateSequence(sequence) {
+  generateSequence(sequence, okVar = null) {
     let code = '';
+    const useGuard = Boolean(this.templates.booleanBacktracking && okVar);
     
-    for (const item of sequence) {
-      code += this.generateItem(item);
+    for (let i = 0; i < sequence.length; i++) {
+      const itemCode = this.generateItem(sequence[i], okVar);
+      if (useGuard && i > 0) {
+        code += `      if (${okVar}) {\n${itemCode}      }\n`;
+      } else {
+        code += itemCode;
+      }
     }
     
     return code;
   }
   
-  generateItem(item) {
+  generateItem(item, okVar = null) {
     switch (item.type) {
       case 'terminal':
-        return this.generateTerminal(item);
+        return this.generateTerminal(item, okVar);
       case 'nonterminal':
-        return this.generateNonterminal(item);
+        return this.generateNonterminal(item, okVar);
       case 'group':
-        return this.generateGroup(item);
+        return this.generateGroup(item, okVar);
       default:
         return '';
     }
   }
   
-  generateTerminal(item) {
+  generateTerminal(item, okVar = null) {
     const templates = this.templates;
     const tokenName = this.getTokenName(item.value);
+    const fail = this.failAction(okVar);
     
     switch (item.quantifier) {
       case 'optional':
@@ -562,14 +588,15 @@ class CodeGenerator {
       case 'zeroOrMore':
         return this.renderTemplate(templates.terminalZeroOrMore, { token: tokenName });
       case 'oneOrMore':
-        return this.renderTemplate(templates.terminalOneOrMore, { token: tokenName });
+        return this.renderTemplate(templates.terminalOneOrMore, { token: tokenName, fail });
       default:
-        return this.renderTemplate(templates.terminalDefault, { token: tokenName });
+        return this.renderTemplate(templates.terminalDefault, { token: tokenName, fail });
     }
   }
   
-  generateNonterminal(item) {
+  generateNonterminal(item, okVar = null) {
     const templates = this.templates;
+    const fail = this.failAction(okVar);
     // If the name is a lexical token, consume it instead of calling a parse rule
     if (this.grammar.tokens.has(item.value)) {
       const contextual = String(item.context || '').toLowerCase() === 'token';
@@ -593,9 +620,9 @@ class CodeGenerator {
         case 'zeroOrMore':
           return this.renderTemplate(fragments.zeroOrMore, { token: this.mapTokenName(item.value) });
         case 'oneOrMore':
-          return this.renderTemplate(fragments.oneOrMore, { token: this.mapTokenName(item.value) });
+          return this.renderTemplate(fragments.oneOrMore, { token: this.mapTokenName(item.value), fail });
         default:
-          return this.renderTemplate(fragments.exactly1, { token: this.mapTokenName(item.value) });
+          return this.renderTemplate(fragments.exactly1, { token: this.mapTokenName(item.value), fail });
       }
     }
 
@@ -615,37 +642,54 @@ class CodeGenerator {
           const boundaryCheck = this.getBoundaryCheck(item.value);
         return this.renderTemplate(templates.nonterminalOneOrMore, {
           name: this.mapRuleName(item.value),
-          boundaryCheck
+          boundaryCheck,
+          fail
         });
         }
       default:
-        return this.renderTemplate(templates.nonterminalDefault, { name: this.mapRuleName(item.value) });
+        return this.renderTemplate(templates.nonterminalDefault, { name: this.mapRuleName(item.value), fail });
     }
   }
   
-  generateGroup(item) {
+  generateGroup(item, okVar = null) {
     const templates = this.templates;
-    // Body that tries to match the group once and throws on failure.
+    const useBool = Boolean(templates.booleanBacktracking);
+    const needsAttemptScope = item.quantifier === 'zeroOrMore'
+      || item.quantifier === 'oneOrMore'
+      || item.quantifier === 'optional';
+    const attemptOk = useBool ? (needsAttemptScope ? this.nextBoolVar() : okVar) : null;
+    const fail = this.failAction(okVar);
+
     let attempt = '';
     if (item.sequences.length === 1) {
-      attempt += this.generateSequence(item.sequences[0]);
+      attempt += this.generateSequence(item.sequences[0], attemptOk);
     } else {
       attempt += templates.groupAlternativesHeader;
       for (const seq of item.sequences) {
-        attempt += this.renderTemplate(templates.groupAlternativeTryBlock, {
-          sequence: this.generateSequence(seq)
-        });
+        if (useBool) {
+          const altOk = this.nextBoolVar();
+          attempt += this.renderTemplate(templates.groupAlternativeTryBlock, {
+            okVar: altOk,
+            sequence: this.generateSequence(seq, altOk)
+          });
+        } else {
+          attempt += this.renderTemplate(templates.groupAlternativeTryBlock, {
+            sequence: this.generateSequence(seq)
+          });
+        }
       }
-      attempt += templates.groupAlternativesFailure;
+      attempt += this.renderTemplate(templates.groupAlternativesFailure, {
+        fail: this.failAction(attemptOk)
+      });
     }
 
     switch (item.quantifier) {
       case 'zeroOrMore':
-        return this.renderTemplate(templates.groupZeroOrMore, { attempt });
+        return this.renderTemplate(templates.groupZeroOrMore, { attempt, okVar: attemptOk });
       case 'oneOrMore':
-        return this.renderTemplate(templates.groupOneOrMore, { attempt });
+        return this.renderTemplate(templates.groupOneOrMore, { attempt, okVar: attemptOk, fail });
       case 'optional':
-        return this.renderTemplate(templates.groupOptional, { attempt });
+        return this.renderTemplate(templates.groupOptional, { attempt, okVar: attemptOk });
       default:
         return this.renderTemplate(templates.groupDefault, { attempt });
     }

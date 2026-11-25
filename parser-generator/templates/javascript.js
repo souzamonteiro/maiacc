@@ -221,10 +221,10 @@ module.exports = {
   }
 }`,
   
-  // Parser header
-  parserHeader: `const __BACKTRACK_ERROR = new Error('Backtrack');
+  booleanBacktracking: true,
 
-class Parser {
+  // Parser header
+  parserHeader: `class Parser {
   constructor(input, eventHandler = null) {
     this.lexer = new Lexer(input);
     this.tokens = this.lexer.tokenize();
@@ -254,13 +254,13 @@ class Parser {
         this.errors.length = 0;
         this.errors.push(errObj);
       }
-      throw __BACKTRACK_ERROR;
+      return false;
     }
     if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
       this.eventHandler.terminal(expectedType, token.value, this.position);
     }
     this.position++;
-    return token;
+    return true;
   }
   
   match(expectedType) {
@@ -294,14 +294,14 @@ class Parser {
         this.errors.length = 0;
         this.errors.push(errObj);
       }
-      throw __BACKTRACK_ERROR;
+      return false;
     }
 
     if (this.eventHandler && typeof this.eventHandler.terminal === 'function') {
       this.eventHandler.terminal(token.type, token.value, this.position);
     }
     this.position++;
-    return token;
+    return true;
   }
 
   markEventState() {
@@ -326,32 +326,18 @@ class Parser {
   // Entry parse method
   startRule: `
   parse() {
-    const prevStackTraceLimit = Error.stackTraceLimit;
-    Error.stackTraceLimit = 0;
-    let result;
-    let parseErr = null;
-    try {
-      result = this.parse{{startRule}}();
-    } catch (e) {
-      parseErr = e;
-    } finally {
-      Error.stackTraceLimit = prevStackTraceLimit;
-    }
-    if (parseErr !== null) {
-      if (parseErr === __BACKTRACK_ERROR) {
-        const err = this._lastError || this.errors[this.errors.length - 1];
-        throw new Error(err ? \`Expected '\${err.expected}', got '\${err.found}'\` : this.getErrorMessage());
-      }
-      throw parseErr;
+    if (!this.parse{{startRule}}()) {
+      const err = this._lastError || this.errors[this.errors.length - 1];
+      throw new Error(err ? \`Expected '\${err.expected}', got '\${err.found}'\` : this.getErrorMessage());
     }
     const next = this.peek();
     if (!next && this.position === this.tokens.length) {
-      return result;
+      return undefined;
     }
     if (!next || next.type !== 'EOF') {
       throw new Error(\`Unexpected token at end: \${next ? next.type : 'EOF(consumed)'}\`);
     }
-    return result;
+    return undefined;
   }`,
   
   // Rule function template
@@ -360,7 +346,7 @@ class Parser {
     const __memoStart = this.position;
     const __memoKey = '{{ruleName}}@' + __memoStart;
     if (this.failureMemo.has(__memoKey)) {
-      throw __BACKTRACK_ERROR;
+      return false;
     }
     if (this._canMemoSuccess) {
       const __memoHit = this.successMemo.get(__memoKey);
@@ -369,41 +355,42 @@ class Parser {
         if (this.eventHandler && __memoHit.node) {
           this.eventHandler.appendNode(__memoHit.node);
         }
-        return;
+        return true;
       }
     }
     if (this.eventHandler && typeof this.eventHandler.startNonterminal === 'function') {
       this.eventHandler.startNonterminal('{{ruleName}}', this.position);
     }
-    let __ok = false;
-    try {
-{{ruleBody}}
-      __ok = true;
-    } finally {
-      if (!__ok) {
-        if (this.failureMemo.size > 200000) {
-          this.failureMemo.clear();
-        }
-        this.failureMemo.add(__memoKey);
+    const __ok = this._parse{{ruleName}}Body();
+    if (!__ok) {
+      if (this.failureMemo.size > 200000) {
+        this.failureMemo.clear();
       }
-      if (this.eventHandler) {
-        if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
-          this.eventHandler.endNonterminal('{{ruleName}}', this.position);
-        }
-        if (!__ok && typeof this.eventHandler.abortNonterminal === 'function') {
-          this.eventHandler.abortNonterminal('{{ruleName}}', this.position);
-        }
+      this.failureMemo.add(__memoKey);
+    }
+    if (this.eventHandler) {
+      if (__ok && typeof this.eventHandler.endNonterminal === 'function') {
+        this.eventHandler.endNonterminal('{{ruleName}}', this.position);
       }
-      if (__ok && this._canMemoSuccess) {
-        if (this.successMemo.size > 200000) {
-          this.successMemo.clear();
-        }
-        this.successMemo.set(__memoKey, {
-          endPos: this.position,
-          node: this.eventHandler ? this.eventHandler.lastClosedNode : null
-        });
+      if (!__ok && typeof this.eventHandler.abortNonterminal === 'function') {
+        this.eventHandler.abortNonterminal('{{ruleName}}', this.position);
       }
     }
+    if (__ok && this._canMemoSuccess) {
+      if (this.successMemo.size > 200000) {
+        this.successMemo.clear();
+      }
+      this.successMemo.set(__memoKey, {
+        endPos: this.position,
+        node: this.eventHandler ? this.eventHandler.lastClosedNode : null
+      });
+    }
+    return __ok;
+  }
+
+  _parse{{ruleName}}Body() {
+{{ruleBody}}
+    return true;
   }`,
   
   // Sequence template (AND)
@@ -450,16 +437,17 @@ class Parser {
 `,
   alternativeTryBlock: `    if (!_matched) {
       const _ruleMark = this.markEventState();
-      try {
-{{sequence}}        _matched = true;
-      } catch (e) {
+      let {{okVar}} = true;
+{{sequence}}      if ({{okVar}}) {
+        _matched = true;
+      } else {
         this.position = _ruleStart;
         this.restoreEventState(_ruleMark);
       }
     }
 `,
   alternativesFailure: `    if (!_matched) {
-      throw __BACKTRACK_ERROR;
+      {{fail}}
     }
 `,
 
@@ -468,10 +456,9 @@ class Parser {
 `,
   terminalZeroOrMore: `    while (this.match('{{token}}')) { /* zero or more matched */ }
 `,
-  terminalOneOrMore: `    this.consume('{{token}}');
-    while (this.match('{{token}}')) { /* additional terminal matched */ }
+  terminalOneOrMore: `    if (!this.consume('{{token}}')) { {{fail}} } else { while (this.match('{{token}}')) { /* additional terminal matched */ } }
 `,
-  terminalDefault: `    this.consume('{{token}}');
+  terminalDefault: `    if (!this.consume('{{token}}')) { {{fail}} }
 `,
 
   // Lexical nonterminal fragments
@@ -479,22 +466,20 @@ class Parser {
 `,
   lexicalZeroOrMore: `    while (this.match('{{token}}')) { /* zero or more */ }
 `,
-  lexicalOneOrMore: `    this.consume('{{token}}');
-    while (this.match('{{token}}')) { /* one or more */ }
+  lexicalOneOrMore: `    if (!this.consume('{{token}}')) { {{fail}} } else { while (this.match('{{token}}')) { /* one or more */ } }
 `,
-  lexicalDefault: `    this.consume('{{token}}');
+  lexicalDefault: `    if (!this.consume('{{token}}')) { {{fail}} }
 `,
 
   // Contextual lexical references (REx: Name^token). A more specific token
   // may have won lexing, but its full text still has to satisfy Name's regex.
-  contextualLexicalOptional: `    { const savePos = this.position; const saveMark = this.markEventState(); try { this.consumeContextual('{{token}}'); } catch (e) { this.position = savePos; this.restoreEventState(saveMark); } }
+  contextualLexicalOptional: `    { const savePos = this.position; const saveMark = this.markEventState(); if (!this.consumeContextual('{{token}}')) { this.position = savePos; this.restoreEventState(saveMark); } }
 `,
-  contextualLexicalZeroOrMore: `    while (true) { const savePos = this.position; const saveMark = this.markEventState(); try { this.consumeContextual('{{token}}'); } catch (e) { this.position = savePos; this.restoreEventState(saveMark); break; } }
+  contextualLexicalZeroOrMore: `    while (true) { const savePos = this.position; const saveMark = this.markEventState(); if (!this.consumeContextual('{{token}}')) { this.position = savePos; this.restoreEventState(saveMark); break; } }
 `,
-  contextualLexicalOneOrMore: `    this.consumeContextual('{{token}}');
-    while (true) { const savePos = this.position; const saveMark = this.markEventState(); try { this.consumeContextual('{{token}}'); } catch (e) { this.position = savePos; this.restoreEventState(saveMark); break; } }
+  contextualLexicalOneOrMore: `    if (!this.consumeContextual('{{token}}')) { {{fail}} } else { while (true) { const savePos = this.position; const saveMark = this.markEventState(); if (!this.consumeContextual('{{token}}')) { this.position = savePos; this.restoreEventState(saveMark); break; } } }
 `,
-  contextualLexicalDefault: `    this.consumeContextual('{{token}}');
+  contextualLexicalDefault: `    if (!this.consumeContextual('{{token}}')) { {{fail}} }
 `,
 
   // Nonterminal item fragments
@@ -502,9 +487,7 @@ class Parser {
     {
       const savePos = this.position;
       const saveMark = this.markEventState();
-      try {
-        this.parse{{name}}();
-      } catch(e) {
+      if (!this.parse{{name}}()) {
         this.position = savePos;
         this.restoreEventState(saveMark);
       }
@@ -528,35 +511,33 @@ class Parser {
   nonterminalZeroOrMore: `    while (true) {
       const savePos = this.position;
       const saveMark = this.markEventState();
-      try {
-        this.parse{{name}}();
-{{boundaryCheck}}        if (this.position === savePos) break;
-      } catch(e) {
+      if (!this.parse{{name}}()) {
         this.position = savePos;
         this.restoreEventState(saveMark);
         break;
       }
+{{boundaryCheck}}      if (this.position === savePos) break;
     }
 `,
-  nonterminalOneOrMore: `    let count = 0;
-    while (true) {
-      const savePos = this.position;
-      const saveMark = this.markEventState();
-      try {
-        this.parse{{name}}();
+  nonterminalOneOrMore: `    {
+      let count = 0;
+      while (true) {
+        const savePos = this.position;
+        const saveMark = this.markEventState();
+        if (!this.parse{{name}}()) {
+          this.position = savePos;
+          this.restoreEventState(saveMark);
+          break;
+        }
 {{boundaryCheck}}        if (this.position === savePos) break;
         count++;
-      } catch(e) {
-        this.position = savePos;
-        this.restoreEventState(saveMark);
-        break;
+      }
+      if (count === 0) {
+        {{fail}}
       }
     }
-    if (count === 0) {
-      throw __BACKTRACK_ERROR;
-    }
 `,
-  nonterminalDefault: `    this.parse{{name}}();
+  nonterminalDefault: `    if (!this.parse{{name}}()) { {{fail}} }
 `,
 
   // Group item fragments
@@ -565,22 +546,23 @@ class Parser {
   groupAlternativeTryBlock: `      if (!_matchedAlt) {
         const _altStart = this.position;
         const _altMark = this.markEventState();
-        try {
-{{sequence}}          _matchedAlt = true;
-        } catch (e) {
+        let {{okVar}} = true;
+{{sequence}}        if ({{okVar}}) {
+          _matchedAlt = true;
+        } else {
           this.position = _altStart;
           this.restoreEventState(_altMark);
         }
       }
 `,
-  groupAlternativesFailure: `      if (!_matchedAlt) { throw __BACKTRACK_ERROR; }
+  groupAlternativesFailure: `      if (!_matchedAlt) { {{fail}} }
 `,
   groupZeroOrMore: `    // Group *
     while (true) {
       const _loopStart = this.position;
       const _loopMark = this.markEventState();
-      try {
-{{attempt}}      } catch (e) {
+      let {{okVar}} = true;
+{{attempt}}      if (!{{okVar}}) {
         this.position = _loopStart;
         this.restoreEventState(_loopMark);
         break;
@@ -594,8 +576,8 @@ class Parser {
       while (true) {
         const _loopStart = this.position;
         const _loopMark = this.markEventState();
-        try {
-{{attempt}}        } catch (e) {
+        let {{okVar}} = true;
+{{attempt}}        if (!{{okVar}}) {
           this.position = _loopStart;
           this.restoreEventState(_loopMark);
           break;
@@ -603,15 +585,15 @@ class Parser {
         if (this.position === _loopStart) break;
         _count++;
       }
-      if (_count === 0) throw __BACKTRACK_ERROR;
+      if (_count === 0) { {{fail}} }
     }
 `,
   groupOptional: `    // Group ?
     {
       const _optStart = this.position;
       const _optMark = this.markEventState();
-      try {
-{{attempt}}      } catch (e) {
+      let {{okVar}} = true;
+{{attempt}}      if (!{{okVar}}) {
         this.position = _optStart;
         this.restoreEventState(_optMark);
       }
