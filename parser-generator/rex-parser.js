@@ -75,6 +75,7 @@ class Lexer {
       let bestPattern = null;
       let bestMatch = null;
       const candidates = [];
+      const remainingInput = this.input.substring(this.position);
 
       const isGenericNameType = (type) => (
         type === 'Name' || type === 'NameChar' || type === 'NameStartChar'
@@ -89,7 +90,7 @@ class Lexer {
         }
 
         const regex = pattern.regex;
-        const match = this.input.substring(this.position).match(regex);
+        const match = remainingInput.match(regex);
 
         if (match && match.index === 0 && match[0].length > 0) {
           let effectivePattern = pattern;
@@ -101,7 +102,7 @@ class Lexer {
             if (this.isTemplateSpanPattern(this.position, 'TemplateMiddle')) {
               const templateMiddle = this.tokenPatterns.find((candidate) => candidate.type === 'TemplateMiddle');
               const templateMatch = templateMiddle
-                ? this.input.substring(this.position).match(templateMiddle.regex)
+                ? remainingInput.match(templateMiddle.regex)
                 : null;
               if (templateMatch && templateMatch.index === 0 && templateMatch[0].length > 0) {
                 effectivePattern = templateMiddle;
@@ -110,7 +111,7 @@ class Lexer {
             } else if (this.isTemplateSpanPattern(this.position, 'TemplateTail')) {
               const templateTail = this.tokenPatterns.find((candidate) => candidate.type === 'TemplateTail');
               const templateMatch = templateTail
-                ? this.input.substring(this.position).match(templateTail.regex)
+                ? remainingInput.match(templateTail.regex)
                 : null;
               if (templateMatch && templateMatch.index === 0 && templateMatch[0].length > 0) {
                 effectivePattern = templateTail;
